@@ -34,15 +34,15 @@ Safeguard is structured across four purpose-built repositories:
 
 ```mermaid
 flowchart TD
-    User([Sender / dApp]) -->|pay(sender, recipient, token, amount)| Contract[Safeguard Payments Contract]
-    Contract --> Check{Policy Evaluation}
-    Check -->|Compliant & Under Cap| Approve[Direct Settlement]
-    Approve -->|SAC Token Transfer| Recipient([Recipient Wallet])
-    Check -->|High Value / Exceeds Cap| Escrow[On-Chain Escrow]
-    Escrow -->|Holds SAC Tokens| Vault[(Escrow Storage)]
-    Vault -->|Admin Releases| Recipient
-    Vault -->|Refund after Timelock| User
-    Check -->|Denylisted / Non-Compliant| Revert[Revert / PaymentDenied]
+    User(["Sender / dApp"]) -->|"pay(sender, recipient, token, amount)"| Contract["Safeguard Payments Contract"]
+    Contract --> Check{"Policy Evaluation"}
+    Check -->|"Compliant &amp; Under Cap"| Approve["Direct Settlement"]
+    Approve -->|"SAC Token Transfer"| Recipient(["Recipient Wallet"])
+    Check -->|"High Value / Exceeds Cap"| Escrow["On-Chain Escrow"]
+    Escrow -->|"Holds SAC Tokens"| Vault[("Escrow Storage")]
+    Vault -->|"Admin Releases"| Recipient
+    Vault -->|"Refund after Timelock"| User
+    Check -->|"Denylisted / Non-Compliant"| Revert["Revert / PaymentDenied"]
 ```
 
 ### Core Components
