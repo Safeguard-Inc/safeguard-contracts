@@ -1,0 +1,23 @@
+{
+  "policy_id": "example-jurisdiction-restricted",
+  "version": 1,
+  "title": "Jurisdiction-restricted policy",
+  "description": "Hard regional gate: subjects in prohibited regions are blocked, subjects in restricted regions are blocked too (block action applies to every non-permitted region), and unknown regions fail closed to block.",
+  "rules": [
+    {
+      "id": "JURISDICTION-001",
+      "type": "jurisdiction",
+      "action": "block",
+      "regions": {
+        "permitted": ["AU", "CA", "CH", "DE", "FR", "GB", "JP", "NL", "SG", "US"],
+        "restricted": ["BY", "RU"],
+        "prohibited": ["CU", "IR", "KP", "SY", "VE"]
+      }
+    }
+  ],
+  "metadata": {
+    "authority": "Safeguard",
+    "reference": "https://github.com/Safeguard-Inc/safeguard-policy/tree/main/policies/examples",
+    "purpose": "Reference example; not for production use as-is."
+  }
+}

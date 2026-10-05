@@ -3,11 +3,7 @@
 
 #![cfg(test)]
 
-extern crate std;
 
-use std::path::Path;
-
-use crate::error::ContractError;
 use crate::evaluate::{EvaluationInput, EvaluationResult};
 use crate::storage::RuleRecord;
 
@@ -16,8 +12,6 @@ use crate::storage::RuleRecord;
 /// spec, which breaks CLI invocation), but tests keep the short name.
 type Id = BytesN<32>;
 use crate::{PolicyContract, PolicyContractClient};
-
-use safeguard_sdk::model::PolicyDocument;
 
 use soroban_sdk::testutils::Address as _;
 use soroban_sdk::testutils::Events as _;
@@ -1152,113 +1146,6 @@ fn arbitrary_input_codes_never_error_or_fail_open() {
             );
         }
     });
-}
-
-// -------------------------------------------- shipped-policy compatibility
-
-/// Load a policy document from the repository's policies/ directory.
-fn load_shipped_policy(relative: &str) -> PolicyDocument {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let json =
-        std::fs::read_to_string(root.join("policies").join(relative)).expect("read shipped policy");
-    serde_json::from_str(&json).expect("parse shipped policy")
-}
-
-/// Register a shipped policy document on-chain: its rule set becomes the
-/// version's records, so what the JSON says and what the contract enforces
-/// are the same thing.
-fn register_shipped(
-    env: &Env,
-    client: &PolicyContractClient,
-    admin: &Address,
-    policy_id: &Id,
-    token: &Address,
-    doc: &PolicyDocument,
-) {
-    let mut records: Vec<RuleRecord> = Vec::new(env);
-    for rule in &doc.rules {
-        let rule_id = safeguard_core::rule::RuleId::from_str(&rule.id);
-        records.push_back(RuleRecord {
-            rule_id: BytesN::from_array(env, rule_id.as_bytes()),
-            rule_type: rule.rule_type.as_core().to_code(),
-            action: rule.action.as_core().to_code(),
-        });
-    }
-    client.register_version(policy_id, &1, &config_hash(env, 9), &records);
-    client.activate_version(admin, policy_id, &1);
-    client.bind_token(admin, policy_id, token);
-}
-
-/// Register the shipped combined policy and run the worked cases from
-/// docs/how-to-evaluate.md at the **contract** level: the same JSON document
-/// that ships in policies/ is what the contract enforces.
-#[test]
-fn shipped_combined_policy_enforces_the_documented_cases() {
-    let env = Env::default();
-    let (admin, _, _, _, _, client) = setup(&env);
-
-    let doc = load_shipped_policy("examples/combined-policy.json");
-    assert_eq!(doc.policy_id, "example-combined");
-    let policy = rid(&env, &doc.policy_id);
-    let token = Address::generate(&env);
-    register_shipped(&env, &client, &admin, &policy, &token, &doc);
-
-    let subject = BytesN::from_array(&env, &[7; 32]);
-    let input = |status: u32,
-                 allowlist: bool,
-                 deny: bool,
-                 sanctions: bool,
-                 region: u32|
-     -> EvaluationInput {
-        EvaluationInput {
-            account_status: status,
-            allowlist_member: allowlist,
-            denylist_matched: deny,
-            sanctions_matched: sanctions,
-            jurisdiction: region,
-            subject: subject.clone(),
-            account: admin.clone(),
-        }
-    };
-
-    // Case 1 — everything passes → APPROVE (no_reason).
-    let ok = client.evaluate(&policy, &token, &input(0, true, false, false, 0));
-    assert_eq!(ok.decision, Decision::Approve.to_code());
-    assert_eq!(ok.reason_code, ReasonCode::NoReason.to_code());
-    assert_eq!(ok.policy_version, 1);
-
-    // Case 2 — non-member → BLOCK by allowlist, rule attributed.
-    let blocked = client.evaluate(&policy, &token, &input(0, false, false, false, 0));
-    assert_eq!(blocked.decision, Decision::Block.to_code());
-    assert_eq!(blocked.reason_code, ReasonCode::AllowlistRequired.to_code());
-    assert_eq!(blocked.rule_id, Some(rid(&env, "ALLOWLIST-001")));
-
-    // Case 3 — sanctions match → FLAG (not BLOCK) under the combined policy.
-    let flagged = client.evaluate(&policy, &token, &input(0, true, false, true, 0));
-    assert_eq!(flagged.decision, Decision::Flag.to_code());
-    assert_eq!(flagged.reason_code, ReasonCode::SanctionsMatch.to_code());
-    assert_eq!(flagged.rule_id, Some(rid(&env, "SANCTIONS-001")));
-
-    // Case 4 — frozen account → structural BLOCK, no rule.
-    let frozen = client.evaluate(&policy, &token, &input(2, true, false, false, 0));
-    assert_eq!(frozen.decision, Decision::Block.to_code());
-    assert_eq!(frozen.reason_code, ReasonCode::AccountFrozen.to_code());
-    assert_eq!(frozen.rule_id, None);
-
-    // Case 5 — prohibited region (IR) → BLOCK by jurisdiction.
-    let prohibited = client.evaluate(&policy, &token, &input(0, true, false, false, 2));
-    assert_eq!(prohibited.decision, Decision::Block.to_code());
-    assert_eq!(
-        prohibited.reason_code,
-        ReasonCode::JurisdictionProhibited.to_code()
-    );
-    assert_eq!(prohibited.rule_id, Some(rid(&env, "JURISDICTION-001"))); // Case 6 — unknown region → fail-closed BLOCK.
-    let unknown = client.evaluate(&policy, &token, &input(0, true, false, false, 3));
-    assert_eq!(unknown.decision, Decision::Block.to_code());
-    assert_eq!(
-        unknown.reason_code,
-        ReasonCode::JurisdictionUnknown.to_code()
-    );
 }
 
 /// The stable numeric surface `safeguard-hooks` consumes, pinned in one

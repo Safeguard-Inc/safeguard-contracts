@@ -1,0 +1,5 @@
+{
+  "permitted": ["AU", "CA", "CH", "DE", "FR", "GB", "JP", "NL", "SG", "US"],
+  "restricted": ["BY", "RU"],
+  "prohibited": ["CU", "IR", "KP", "SY", "VE"]
+}

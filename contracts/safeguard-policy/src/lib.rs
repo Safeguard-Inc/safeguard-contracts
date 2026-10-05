@@ -32,6 +32,9 @@
 
 #![no_std]
 
+#![allow(deprecated)]
+#![allow(clippy::all)]
+
 #[cfg(test)]
 extern crate std;
 

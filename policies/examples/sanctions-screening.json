@@ -1,0 +1,18 @@
+{
+  "policy_id": "example-sanctions-screening",
+  "version": 1,
+  "title": "Sanctions screening policy",
+  "description": "Every subject is screened against the normalized sanctions dataset; matches flag for review. Demonstrates the flag severity: a match never approves, but the operator chooses investigation over hard denial.",
+  "rules": [
+    {
+      "id": "SANCTIONS-001",
+      "type": "sanctions",
+      "action": "flag"
+    }
+  ],
+  "metadata": {
+    "authority": "Safeguard",
+    "reference": "https://github.com/Safeguard-Inc/safeguard-policy/tree/main/policies/examples",
+    "purpose": "Reference example; not for production use as-is."
+  }
+}

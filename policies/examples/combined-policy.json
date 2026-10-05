@@ -1,0 +1,38 @@
+{
+  "policy_id": "example-combined",
+  "version": 1,
+  "title": "Combined compliance policy",
+  "description": "All four rule categories with mixed severities, demonstrating the precedence model: allowlist and denylist block, sanctions flag for review, jurisdiction blocks non-permitted regions.",
+  "rules": [
+    {
+      "id": "ALLOWLIST-001",
+      "type": "allowlist",
+      "action": "block"
+    },
+    {
+      "id": "DENYLIST-001",
+      "type": "denylist",
+      "action": "block"
+    },
+    {
+      "id": "SANCTIONS-001",
+      "type": "sanctions",
+      "action": "flag"
+    },
+    {
+      "id": "JURISDICTION-001",
+      "type": "jurisdiction",
+      "action": "block",
+      "regions": {
+        "permitted": ["AU", "CA", "CH", "DE", "FR", "GB", "JP", "NL", "SG", "US"],
+        "restricted": ["BY", "RU"],
+        "prohibited": ["CU", "IR", "KP", "SY", "VE"]
+      }
+    }
+  ],
+  "metadata": {
+    "authority": "Safeguard",
+    "reference": "https://github.com/Safeguard-Inc/safeguard-policy/tree/main/policies/examples",
+    "purpose": "Reference example; not for production use as-is."
+  }
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "subject_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+    "list_id": "OFAC-SDN",
+    "status": "active",
+    "dataset_version": 42,
+    "effective_at": "2023-06-01T00:00:00Z",
+    "source": "ofac"
+  },
+  {
+    "subject_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "list_id": "OFAC-SDN",
+    "status": "active",
+    "dataset_version": 42,
+    "effective_at": "2024-01-15T00:00:00Z",
+    "source": "ofac"
+  },
+  {
+    "subject_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "list_id": "EU-CONSOLIDATED",
+    "status": "inactive",
+    "dataset_version": 7,
+    "effective_at": "2022-11-20T00:00:00Z",
+    "source": "eu"
+  }
+]

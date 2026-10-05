@@ -1,0 +1,46 @@
+{
+  "accounts": [
+    {
+      "account": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+      "status": "active",
+      "jurisdiction": "US",
+      "allowlisted": true,
+      "denylisted": false
+    },
+    {
+      "account": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAC5N",
+      "status": "active",
+      "jurisdiction": "DE",
+      "allowlisted": true,
+      "denylisted": false
+    },
+    {
+      "account": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZNF",
+      "status": "restricted",
+      "jurisdiction": "RU",
+      "allowlisted": true,
+      "denylisted": false
+    },
+    {
+      "account": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWLY",
+      "status": "frozen",
+      "jurisdiction": "US",
+      "allowlisted": true,
+      "denylisted": false
+    },
+    {
+      "account": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACJN",
+      "status": "suspended",
+      "jurisdiction": "GB",
+      "allowlisted": false,
+      "denylisted": true
+    },
+    {
+      "account": "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAZ3E",
+      "status": "unknown",
+      "jurisdiction": "XX",
+      "allowlisted": false,
+      "denylisted": false
+    }
+  ]
+}

@@ -19,3 +19,5 @@ safeguard-core = { path = "../../crates/safeguard-core", version = "0.1.0" }
 
 [dev-dependencies]
 soroban-sdk = { version = "27.0.6", features = ["testutils"] }
+serde_json = "1"
+proptest = "1"

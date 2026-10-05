@@ -1,0 +1,18 @@
+{
+  "policy_id": "example-denylist-only",
+  "version": 1,
+  "title": "Denylist-only policy",
+  "description": "Open access except for listed subjects. Demonstrates a permissive baseline where only a denylist is enforced; listed subjects are blocked, everyone else is approved (subject to account status).",
+  "rules": [
+    {
+      "id": "DENYLIST-001",
+      "type": "denylist",
+      "action": "block"
+    }
+  ],
+  "metadata": {
+    "authority": "Safeguard",
+    "reference": "https://github.com/Safeguard-Inc/safeguard-policy/tree/main/policies/examples",
+    "purpose": "Reference example; not for production use as-is."
+  }
+}

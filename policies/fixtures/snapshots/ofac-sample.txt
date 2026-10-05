@@ -1,0 +1,15 @@
+# Sample OFAC-style snapshot for `safeguard dataset build`.
+#
+# Pipe-delimited: subject|list-code|status|effective-date
+# `active` listings are in force; `removed` becomes inactive. Lines starting
+# with `#` and blank lines are ignored.
+#
+# This is a fictional sample for tooling and tests — it is NOT a real
+# sanctions dataset. Real provider exports replace this file.
+
+bin laden, usama|SDN|active|2023-06-01
+qods force|SSI|active|2021-04-15
+pyongyang bank, korea|SDN|active|2022-11-20
+al-qaeda|SDN|removed|2019-03-15
+retired shipping co.|CAPTA|removed|2018-07-22
+unmapped sample entity|NONSTANDARD|active|2023-01-01

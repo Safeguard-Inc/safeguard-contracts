@@ -1,0 +1,18 @@
+{
+  "policy_id": "example-allowlist-only",
+  "version": 1,
+  "title": "Allowlist-only policy",
+  "description": "The simplest possible gate: only allowlisted accounts may transact. Every other check is skipped because no rule of that type is enabled.",
+  "rules": [
+    {
+      "id": "ALLOWLIST-001",
+      "type": "allowlist",
+      "action": "block"
+    }
+  ],
+  "metadata": {
+    "authority": "Safeguard",
+    "reference": "https://github.com/Safeguard-Inc/safeguard-policy/tree/main/policies/examples",
+    "purpose": "Reference example; not for production use as-is."
+  }
+}
