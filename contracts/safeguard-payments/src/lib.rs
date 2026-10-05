@@ -98,11 +98,15 @@ impl SafeguardPayments {
         admin.require_auth();
 
         env.storage().instance().set(&DataKey::Admin, &admin);
-        env.storage().instance().set(&DataKey::EscrowPeriod, &escrow_period);
+        env.storage()
+            .instance()
+            .set(&DataKey::EscrowPeriod, &escrow_period);
         env.storage().instance().set(&DataKey::SpendCap, &spend_cap);
         env.storage().instance().set(&DataKey::IsPaused, &false);
         env.storage().instance().set(&DataKey::EscrowCounter, &0u64);
-        env.storage().instance().set(&DataKey::RequireAllowlist, &false);
+        env.storage()
+            .instance()
+            .set(&DataKey::RequireAllowlist, &false);
 
         env.events().publish((symbol_short!("init"),), admin);
 
@@ -140,7 +144,9 @@ impl SafeguardPayments {
     /// Add an address to the denylist.
     pub fn add_to_denylist(env: Env, address: Address) -> Result<(), PaymentError> {
         Self::require_admin(&env)?;
-        env.storage().persistent().set(&DataKey::Denylist(address.clone()), &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Denylist(address.clone()), &true);
         env.events().publish((symbol_short!("deny_add"),), address);
         Ok(())
     }
@@ -148,7 +154,9 @@ impl SafeguardPayments {
     /// Remove an address from the denylist.
     pub fn remove_from_denylist(env: Env, address: Address) -> Result<(), PaymentError> {
         Self::require_admin(&env)?;
-        env.storage().persistent().remove(&DataKey::Denylist(address.clone()));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Denylist(address.clone()));
         env.events().publish((symbol_short!("deny_rem"),), address);
         Ok(())
     }
@@ -180,7 +188,11 @@ impl SafeguardPayments {
             return Err(PaymentError::NotInitialized);
         }
 
-        let is_paused: bool = env.storage().instance().get(&DataKey::IsPaused).unwrap_or(false);
+        let is_paused: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::IsPaused)
+            .unwrap_or(false);
         if is_paused {
             return Err(PaymentError::ContractPaused);
         }
@@ -207,7 +219,11 @@ impl SafeguardPayments {
             return Err(PaymentError::RecipientDenylisted);
         }
 
-        let spend_cap: i128 = env.storage().instance().get(&DataKey::SpendCap).unwrap_or(i128::MAX);
+        let spend_cap: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::SpendCap)
+            .unwrap_or(i128::MAX);
         let timestamp = env.ledger().timestamp();
 
         // 3. Routing: direct vs escrow
@@ -216,11 +232,21 @@ impl SafeguardPayments {
             let token_client = token::Client::new(&env, &token);
             token_client.transfer(&sender, &env.current_contract_address(), &amount);
 
-            let mut counter: u64 = env.storage().instance().get(&DataKey::EscrowCounter).unwrap_or(0);
+            let mut counter: u64 = env
+                .storage()
+                .instance()
+                .get(&DataKey::EscrowCounter)
+                .unwrap_or(0);
             counter += 1;
-            env.storage().instance().set(&DataKey::EscrowCounter, &counter);
+            env.storage()
+                .instance()
+                .set(&DataKey::EscrowCounter, &counter);
 
-            let escrow_period: u64 = env.storage().instance().get(&DataKey::EscrowPeriod).unwrap_or(86400);
+            let escrow_period: u64 = env
+                .storage()
+                .instance()
+                .get(&DataKey::EscrowPeriod)
+                .unwrap_or(86400);
             let release_after = timestamp + escrow_period;
 
             let record = EscrowRecord {
@@ -234,7 +260,9 @@ impl SafeguardPayments {
                 status: EscrowStatus::Pending,
             };
 
-            env.storage().persistent().set(&DataKey::Escrow(counter), &record);
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(counter), &record);
 
             env.events().publish(
                 (symbol_short!("pay_esc"),),
@@ -289,10 +317,16 @@ impl SafeguardPayments {
         }
 
         let token_client = token::Client::new(&env, &record.token);
-        token_client.transfer(&env.current_contract_address(), &record.recipient, &record.amount);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &record.recipient,
+            &record.amount,
+        );
 
         record.status = EscrowStatus::Released;
-        env.storage().persistent().set(&DataKey::Escrow(escrow_id), &record);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &record);
 
         env.events().publish(
             (symbol_short!("esc_rel"),),
@@ -330,10 +364,16 @@ impl SafeguardPayments {
         }
 
         let token_client = token::Client::new(&env, &record.token);
-        token_client.transfer(&env.current_contract_address(), &record.sender, &record.amount);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &record.sender,
+            &record.amount,
+        );
 
         record.status = EscrowStatus::Refunded;
-        env.storage().persistent().set(&DataKey::Escrow(escrow_id), &record);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &record);
 
         env.events().publish(
             (symbol_short!("esc_ref"),),
@@ -354,10 +394,26 @@ impl SafeguardPayments {
     /// Read contract configuration.
     pub fn get_config(env: Env) -> (Address, i128, u64, bool, u64) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
-        let spend_cap: i128 = env.storage().instance().get(&DataKey::SpendCap).unwrap_or(0);
-        let escrow_period: u64 = env.storage().instance().get(&DataKey::EscrowPeriod).unwrap_or(0);
-        let is_paused: bool = env.storage().instance().get(&DataKey::IsPaused).unwrap_or(false);
-        let total_escrows: u64 = env.storage().instance().get(&DataKey::EscrowCounter).unwrap_or(0);
+        let spend_cap: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::SpendCap)
+            .unwrap_or(0);
+        let escrow_period: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::EscrowPeriod)
+            .unwrap_or(0);
+        let is_paused: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::IsPaused)
+            .unwrap_or(false);
+        let total_escrows: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::EscrowCounter)
+            .unwrap_or(0);
         (admin, spend_cap, escrow_period, is_paused, total_escrows)
     }
 

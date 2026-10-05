@@ -160,7 +160,12 @@ fn test_denylist_blocks_recipient() {
     assert!(client.is_denylisted(&blocked_recipient));
 
     // Must panic / revert
-    client.pay(&sender, &blocked_recipient, &token_client.address, &50_0000000);
+    client.pay(
+        &sender,
+        &blocked_recipient,
+        &token_client.address,
+        &50_0000000,
+    );
 }
 
 #[test]
