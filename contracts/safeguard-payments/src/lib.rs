@@ -230,9 +230,9 @@ impl SafeguardPayments {
 
         // 3. Routing: direct vs escrow
         if amount > spend_cap {
-            // Divert to escrow for admin review
             let token_client = token::Client::new(&env, &token);
-            token_client.transfer(&sender, &env.current_contract_address(), &amount);
+            let contract_addr = env.current_contract_address();
+            token_client.transfer(&sender, &contract_addr, &amount);
 
             let mut counter: u64 = env
                 .storage()

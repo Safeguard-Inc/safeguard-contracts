@@ -3,6 +3,7 @@
 
 #![cfg(test)]
 
+use crate::error::ContractError;
 use crate::evaluate::{EvaluationInput, EvaluationResult};
 use crate::storage::RuleRecord;
 
