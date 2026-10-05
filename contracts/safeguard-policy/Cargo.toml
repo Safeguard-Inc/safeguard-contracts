@@ -1,0 +1,21 @@
+[package]
+name = "safeguard-policy"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "Soroban policy contract for deterministic compliance and rule enforcement"
+keywords = ["stellar", "soroban", "compliance", "policy"]
+
+[lints.rust]
+unsafe_code = "allow"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { version = "27.0.6" }
+safeguard-core = { path = "../../crates/safeguard-core", version = "0.1.0" }
+
+[dev-dependencies]
+soroban-sdk = { version = "27.0.6", features = ["testutils"] }

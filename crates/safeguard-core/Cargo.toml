@@ -1,0 +1,15 @@
+[package]
+name = "safeguard-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Deterministic policy and rule evaluation engine for Soroban smart contracts on Stellar"
+keywords = ["stellar", "soroban", "compliance", "policy", "payments"]
+categories = ["cryptography::cryptocurrencies"]
+
+[dependencies]
+
+[dev-dependencies]
+proptest = "1"
