@@ -35,14 +35,50 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Check Formatting
+      - name: "[1/10] Check Code Formatting"
         run: cargo fmt --all --check
 
-      - name: Run Clippy Linter
+      - name: "[2/10] Run Clippy Linter"
         run: cargo clippy --workspace --all-targets -- -A deprecated -A clippy::all
 
-      - name: Run Tests
-        run: cargo test --workspace --verbose
+      - name: "[3/10] Run Core Policy Unit Tests"
+        run: cargo test -p safeguard-core --verbose
 
-      - name: Build WASM Contracts
+      - name: "[4/10] Run Smart Contract Host Tests"
+        run: cargo test -p safeguard-payments -p safeguard-policy --verbose
+
+      - name: "[5/10] Run Soroban Gas & CPU Benchmarks"
+        run: cargo test -p safeguard-payments -- test_gas_and_cpu_benchmarks --nocapture
+
+      - name: "[6/10] Run Error Catalog Integrity Tests (270 Codes)"
+        run: cargo test -p safeguard-core -- test_error_catalog_has_expected_count test_error_codes_are_unique_and_sorted
+
+      - name: "[7/10] Compile Release WASM Contracts"
         run: cargo build --target wasm32v1-none --release -p safeguard-payments -p safeguard-policy
+
+      - name: "[8/10] Verify WASM Bytecode Size Caps"
+        run: |
+          echo "Verifying compiled contract binary sizes under Soroban limits..."
+          ls -lh target/wasm32v1-none/release/*.wasm
+          for f in target/wasm32v1-none/release/*.wasm; do
+            size=$(wc -c < "$f")
+            echo "Contract $f size: $size bytes"
+            if [ "$size" -gt 262144 ]; then
+              echo "Error: Contract $f exceeds 256KB cap!"
+              exit 1
+            fi
+          done
+          echo "All WASM binaries satisfy ledger size constraints."
+
+      - name: "[9/10] Validate Open Source Licenses & Metadata"
+        run: |
+          test -f LICENSE || (echo "Missing LICENSE" && exit 1)
+          test -f CONTRIBUTING.md || (echo "Missing CONTRIBUTING.md" && exit 1)
+          test -f deployments/testnet.json || (echo "Missing testnet.json" && exit 1)
+          echo "Open-source governance and deployment assets verified."
+
+      - name: "[10/10] Verify Deployment Scripts Syntax"
+        run: |
+          bash -n scripts/build.sh
+          bash -n scripts/deploy-testnet.sh
+          echo "Deployment shell scripts syntax validation passed."

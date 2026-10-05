@@ -37,6 +37,7 @@
 extern crate std;
 
 pub mod decision;
+pub mod error_catalog;
 pub mod evaluation;
 pub mod evaluator;
 pub mod policy;

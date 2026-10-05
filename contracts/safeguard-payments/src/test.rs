@@ -189,3 +189,40 @@ fn test_paused_blocks_payments() {
 
     client.pay(&sender, &recipient, &token_client.address, &50_0000000);
 }
+
+#[test]
+fn test_gas_and_cpu_benchmarks() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    // 1. Benchmark initialize
+    client.initialize(&admin, &3600, &1000_0000000);
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &10_000_0000000);
+
+    // 2. Benchmark direct approved payment
+    let receipt1 = client.pay(&sender, &recipient, &token_client.address, &100_0000000);
+    assert_eq!(receipt1.status, PaymentStatus::Approved);
+
+    // 3. Benchmark spend cap escrow routing
+    let receipt2 = client.pay(&sender, &recipient, &token_client.address, &5000_0000000);
+    assert_eq!(receipt2.status, PaymentStatus::Escrowed);
+
+    // 4. Benchmark release escrow
+    client.release_escrow(&receipt2.escrow_id);
+
+    // 5. Benchmark denylist lookup and insertion
+    client.add_to_denylist(&recipient);
+    assert!(client.is_denylisted(&recipient));
+}

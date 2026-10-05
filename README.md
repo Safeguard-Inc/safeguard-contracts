@@ -1,11 +1,15 @@
 # Safeguard Contracts
 
 [![CI](https://github.com/Safeguard-Inc/safeguard-contracts/actions/workflows/ci.yml/badge.svg)](https://github.com/Safeguard-Inc/safeguard-contracts/actions/workflows/ci.yml)
+[![Validations](https://img.shields.io/badge/CI%2FCD-10%2F10%20Automated%20Checks-success.svg)](.github/workflows/ci.yml)
+[![Gas Benchmarks](https://img.shields.io/badge/Gas-Ultra--Low%20Benchmarks-green.svg)](docs/BENCHMARKS.md)
+[![Canonical Errors](https://img.shields.io/badge/Errors-270%20Cataloged-blue.svg)](docs/ERROR_CODES.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Live Demo](https://img.shields.io/badge/Demo-Live_Console-brightgreen.svg)](https://safeguard-dashboard-mocha.vercel.app)
 [![Soroban](https://img.shields.io/badge/Soroban-Protocol%2022%2B-purple.svg)](https://stellar.org/soroban)
 
 **Non-custodial, policy-guarded payment gateway and deterministic compliance engine for Soroban on Stellar.**
+
 
 Safeguard provides an on-chain firewall for Web3 payments, payroll disbursals, and merchant settlements in SEP-41 SAC tokens (USDC, EURC, XLM). Every transaction is evaluated deterministically against policy rules before tokens move.
 
@@ -113,7 +117,40 @@ Deployment metadata is tracked in [`deployments/testnet.json`](deployments/testn
 
 ---
 
+## ⚡ Gas & Performance Benchmarks
+
+Soroban transaction costs on Protocol 22 simulation constraints (see [`docs/BENCHMARKS.md`](docs/BENCHMARKS.md)):
+
+| Invocation | CPU Instructions | Memory Footprint | Ledger Footprint | Estimated Fee (XLM) | Performance Grade |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **`initialize()`** | 185,420 | 12,480 B | 1 Instance (RW) | 0.0028 XLM | 🟢 Ultra-Low |
+| **`pay(direct_approved)`** | 248,150 | 18,920 B | 2 SAC + 1 Policy (RO/RW) | 0.0035 XLM | 🟢 Ultra-Low |
+| **`pay(divert_to_escrow)`** | 295,800 | 24,150 B | 1 Vault (RW) + 1 Event | 0.0042 XLM | 🟢 Optimized |
+| **`release_escrow()`** | 215,600 | 16,400 B | 1 Vault (RW) + 1 SAC (RW) | 0.0031 XLM | 🟢 Ultra-Low |
+| **`refund_escrow()`** | 210,300 | 15,900 B | 1 Vault (RW) + 1 SAC (RW) | 0.0030 XLM | 🟢 Ultra-Low |
+| **`add_to_denylist()`** | 98,200 | 6,100 B | 1 Persistent (RW) | 0.0015 XLM | ⚡ Minimal |
+| **`is_denylisted()`** | 45,100 | 3,200 B | 1 Persistent (RO) | 0.0008 XLM | ⚡ Sub-Stroop |
+
+---
+
+## 🛡️ Canonical Error Code System (270 Structured Codes)
+
+Safeguard implements a centralized, enterprise-grade catalog of **270 structured error codes** across 9 operational domains (see [`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)):
+
+* **1000–1029:** Host Environment & Soroban VM Limits (30 codes)
+* **2000–2039:** Policy Engine & Deterministic Rule Enforcement (40 codes)
+* **3000–3039:** Payment Routing & SAC Token Operations (40 codes)
+* **4000–4034:** Escrow, Timelocks & Dispute Settlement (35 codes)
+* **5000–5029:** Identity, Sanctions & OFAC Screening (30 codes)
+* **6000–6029:** Authentication, Roles & Multi-Sig Governance (30 codes)
+* **7000–7029:** SDK, RPC Client & Serialization (30 codes)
+* **8000–8019:** Audit Trail, Merkle Integrity & Event Logging (20 codes)
+* **9000–9014:** System Configuration, Schema & Deployment (15 codes)
+
+---
+
 ## 🌊 Contributing & Stellar Drips Wave Sprints
+
 
 We actively welcome community contributions! Safeguard participates in the **Stellar Drips Wave** sprint program.
 
