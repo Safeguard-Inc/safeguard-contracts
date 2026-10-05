@@ -31,7 +31,6 @@
 //! see `safeguard-core` and `docs/security.md`.
 
 #![no_std]
-
 #![allow(deprecated)]
 #![allow(clippy::all)]
 
