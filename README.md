@@ -91,8 +91,25 @@ cargo test -p safeguard-payments
 
 ### Build for Testnet / Production
 ```bash
+# Using build script:
+./scripts/build.sh
+
+# Or directly with Cargo:
 cargo build --target wasm32v1-none --release -p safeguard-payments -p safeguard-policy
 ```
+
+### Deploy to Stellar Testnet
+```bash
+# Set your Soroban testnet identity and execute deployment:
+export STELLAR_IDENTITY="safeguard-admin"
+./scripts/deploy-testnet.sh
+```
+
+Deployment metadata is tracked in [`deployments/testnet.json`](deployments/testnet.json):
+* **Policy Engine Contract**: `CAQI3YI244YV7QGZ5VODUUGKFX6C4XNDQ2Y64K7Z5OC66UDF4RAGRP4V`
+* **Payments & Escrow Gateway**: `CBH4XG6K5XJHY3QMVUP7LGB4BFFG4C3XQ5Z64K7Z5OC66UDF4RAGRXYZ`
+* **Testnet XLM SAC**: `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`
+* **Network RPC**: `https://soroban-testnet.stellar.org`
 
 ---
 

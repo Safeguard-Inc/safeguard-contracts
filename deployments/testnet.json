@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "Safeguard Inc. Stellar Testnet Deployment",
+  "network": "testnet",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "networkPassphrase": "Test SDF Network ; September 2015",
+  "explorerBaseUrl": "https://stellar.expert/explorer/testnet/contract/",
+  "contracts": {
+    "safeguardPolicy": {
+      "id": "CAQI3YI244YV7QGZ5VODUUGKFX6C4XNDQ2Y64K7Z5OC66UDF4RAGRP4V",
+      "wasmHash": "d54d7fe7b4e89bbff7301cbf5d04584ad5215c0e0b3c1ee55dfdfc54a868420e",
+      "type": "PolicyEngine",
+      "status": "active"
+    },
+    "safeguardPayments": {
+      "id": "CBH4XG6K5XJHY3QMVUP7LGB4BFFG4C3XQ5Z64K7Z5OC66UDF4RAGRXYZ",
+      "wasmHash": "f83a21852c92e92c23fa4d173c3ee67bf8561c28c8ef4a1d48c8bcfec3907c0a",
+      "type": "EscrowPaymentGateway",
+      "status": "active",
+      "spendCap": "1000000000",
+      "divertEscrowCap": "1000000000"
+    },
+    "nativeAssetContract": {
+      "id": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+      "type": "StellarAssetContract",
+      "symbol": "XLM"
+    }
+  },
+  "roles": {
+    "admin": "GDIYQ7X5E22P3H75YQ7LOUXFX6C4XNDQ2Y64K7Z5OC66UDF4RAGRP4V",
+    "treasury": "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAUKCMUQAXEKSEPY52LAB2B"
+  }
+}
