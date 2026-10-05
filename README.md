@@ -36,7 +36,7 @@ Safeguard is structured across four purpose-built repositories:
 flowchart TD
     User(["Sender / dApp"]) -->|"pay(sender, recipient, token, amount)"| Contract["Safeguard Payments Contract"]
     Contract --> Check{"Policy Evaluation"}
-    Check -->|"Compliant &amp; Under Cap"| Approve["Direct Settlement"]
+    Check -->|"Compliant & Under Cap"| Approve["Direct Settlement"]
     Approve -->|"SAC Token Transfer"| Recipient(["Recipient Wallet"])
     Check -->|"High Value / Exceeds Cap"| Escrow["On-Chain Escrow"]
     Escrow -->|"Holds SAC Tokens"| Vault[("Escrow Storage")]
