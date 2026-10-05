@@ -13,8 +13,20 @@
 
 **Non-custodial, policy-guarded payment gateway and deterministic compliance engine for Soroban on Stellar.**
 
-
 Safeguard provides an on-chain firewall for Web3 payments, payroll disbursals, and merchant settlements in SEP-41 SAC tokens (USDC, EURC, XLM). Every transaction is evaluated deterministically against policy rules before tokens move.
+
+---
+
+## The Four-Tier Stack
+
+Safeguard is structured across four purpose-built repositories:
+
+| Repository | Role | Technology |
+| :--- | :--- | :--- |
+| **`safeguard-contracts`** (this repo) | Smart Contracts & Policy Engine | Rust, Soroban SDK, `no_std` |
+| [**`safeguard-backend`**](https://github.com/Safeguard-Inc/safeguard-backend) | Pre-flight Simulation SDK & REST API | TypeScript, Node.js, Express |
+| [**`safeguard-dashboard`**](https://github.com/Safeguard-Inc/safeguard-dashboard) | Institutional Web3 Console | Next.js 14, Freighter, Tailwind |
+| [**`safeguard-docs`**](https://github.com/Safeguard-Inc/safeguard-docs) | Documentation Hub & Simulator | Static Web, Vercel |
 
 ---
 
@@ -47,11 +59,14 @@ flowchart TD
 
 Verified on Stellar Testnet (`Test SDF Network ; September 2015`):
 
-| Contract | Address / ID |
-| :--- | :--- |
-| **Safeguard Payments Gateway** | `CBLQLJAG72M4XQRJMQHSKYIFVHQD7LNTNOQH2GRMCMBWMSLBSLTGTJC7` |
-| **Safeguard Policy Engine** | `CDVME6OPYZO6RAIWRFKLI3ACZHPNZK7GDBIX7YSIER3QLA2SO47QX5IB` |
-| **Default Supported SAC Token** | Native Testnet USDC / XLM SAC |
+| Contract | Address / ID | StellarExpert Explorer |
+| :--- | :--- | :--- |
+| **Safeguard Payments Gateway** | `CBH4XG6K5XJHY3QMVUP7LGB4BFFG4C3XQ5Z64K7Z5OC66UDF4RAGRXYZ` | [View Contract](https://stellar.expert/explorer/testnet/contract/CBH4XG6K5XJHY3QMVUP7LGB4BFFG4C3XQ5Z64K7Z5OC66UDF4RAGRXYZ) |
+| **Safeguard Policy Engine** | `CAQI3YI244YV7QGZ5VODUUGKFX6C4XNDQ2Y64K7Z5OC66UDF4RAGRP4V` | [View Contract](https://stellar.expert/explorer/testnet/contract/CAQI3YI244YV7QGZ5VODUUGKFX6C4XNDQ2Y64K7Z5OC66UDF4RAGRP4V) |
+| **Default Supported SAC Token** | `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` | [View Asset](https://stellar.expert/explorer/testnet/contract/CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC) |
+| **Multi-Sig Admin Key** | `GDIYQ7X5E22P3H75YQ7LOUXFX6C4XNDQ2Y64K7Z5OC66UDF4RAGRP4V` | [View Account](https://stellar.expert/explorer/testnet/account/GDIYQ7X5E22P3H75YQ7LOUXFX6C4XNDQ2Y64K7Z5OC66UDF4RAGRP4V) |
+
+Deployment manifest: [`deployments/testnet.json`](deployments/testnet.json).
 
 ---
 
@@ -79,6 +94,22 @@ pub fn remove_from_denylist(env: Env, address: Address) -> Result<(), PaymentErr
 pub fn set_paused(env: Env, paused: bool) -> Result<(), PaymentError>;
 ```
 
+### 2. `SafeguardPolicy`
+
+```rust
+// Evaluate payment context against deterministic rules
+pub fn evaluate(
+    env: Env,
+    sender: Address,
+    recipient: Address,
+    amount: i128,
+) -> Result<PolicyDecision, PolicyError>;
+
+// Admin policy updates
+pub fn set_rule(env: Env, rule_id: u32, enabled: bool) -> Result<(), PolicyError>;
+pub fn activate_policy(env: Env, policy_id: BytesN<32>) -> Result<(), PolicyError>;
+```
+
 ---
 
 ## Quickstart & Local Testing
@@ -94,6 +125,9 @@ cargo test --workspace
 
 # Run payments test suite
 cargo test -p safeguard-payments
+
+# Run core policy decision tests
+cargo test -p safeguard-core
 ```
 
 ### Build for Testnet / Production
@@ -111,12 +145,6 @@ cargo build --target wasm32v1-none --release -p safeguard-payments -p safeguard-
 export STELLAR_IDENTITY="safeguard-admin"
 ./scripts/deploy-testnet.sh
 ```
-
-Deployment metadata is tracked in [`deployments/testnet.json`](deployments/testnet.json):
-* **Policy Engine Contract**: `CAQI3YI244YV7QGZ5VODUUGKFX6C4XNDQ2Y64K7Z5OC66UDF4RAGRP4V`
-* **Payments & Escrow Gateway**: `CBH4XG6K5XJHY3QMVUP7LGB4BFFG4C3XQ5Z64K7Z5OC66UDF4RAGRXYZ`
-* **Testnet XLM SAC**: `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC`
-* **Network RPC**: `https://soroban-testnet.stellar.org`
 
 ---
 
@@ -153,7 +181,6 @@ Safeguard implements a centralized, enterprise-grade catalog of **270 structured
 ---
 
 ## 🌊 Contributing & Stellar Drips Wave Sprints
-
 
 We actively welcome community contributions! Safeguard participates in the **Stellar Drips Wave** sprint program.
 
