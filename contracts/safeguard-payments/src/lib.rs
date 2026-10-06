@@ -3,7 +3,8 @@
 #![allow(clippy::all)]
 
 use soroban_sdk::{
-    contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env, Symbol,
+    contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env,
+    IntoVal, Symbol,
 };
 
 #[contracterror]
@@ -171,6 +172,30 @@ impl SafeguardPayments {
             .unwrap_or(false)
     }
 
+    /// Configure the external SafeguardPolicy contract address.
+    pub fn set_policy_contract(env: Env, policy_contract: Address) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        env.storage()
+            .instance()
+            .set(&DataKey::PolicyContract, &policy_contract);
+        env.events()
+            .publish((symbol_short!("set_pol"),), policy_contract);
+        Ok(())
+    }
+
+    /// Retrieve the configured SafeguardPolicy contract address.
+    pub fn get_policy_contract(env: Env) -> Option<Address> {
+        env.storage().instance().get(&DataKey::PolicyContract)
+    }
+
+    /// Remove the configured SafeguardPolicy contract address.
+    pub fn remove_policy_contract(env: Env) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        env.storage().instance().remove(&DataKey::PolicyContract);
+        env.events().publish((symbol_short!("rem_pol"),), ());
+        Ok(())
+    }
+
     /// Execute a policy-guarded payment in a SEP-41 SAC token.
     ///
     /// Outcomes:
@@ -219,6 +244,53 @@ impl SafeguardPayments {
                 (sender.clone(), recipient.clone(), amount),
             );
             return Err(PaymentError::RecipientDenylisted);
+        }
+
+        // 3. Screen sender and recipient against external PolicyContract if wired
+        if let Some(policy_contract) = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&DataKey::PolicyContract)
+        {
+            let auth_fn = Symbol::new(&env, "is_authorized");
+
+            // Screen sender
+            let sender_args = (sender.clone(), token.clone()).into_val(&env);
+            let sender_allowed = match env.try_invoke_contract::<bool, soroban_sdk::Error>(
+                &policy_contract,
+                &auth_fn,
+                sender_args,
+            ) {
+                Ok(Ok(allowed)) => allowed,
+                _ => false, // fail closed if call fails, reverts, or returns false
+            };
+
+            if !sender_allowed {
+                env.events().publish(
+                    (symbol_short!("pay_block"), symbol_short!("pol_snd")),
+                    (sender.clone(), recipient.clone(), amount),
+                );
+                return Err(PaymentError::PolicyDenied);
+            }
+
+            // Screen recipient
+            let recipient_args = (recipient.clone(), token.clone()).into_val(&env);
+            let recipient_allowed = match env.try_invoke_contract::<bool, soroban_sdk::Error>(
+                &policy_contract,
+                &auth_fn,
+                recipient_args,
+            ) {
+                Ok(Ok(allowed)) => allowed,
+                _ => false, // fail closed if call fails, reverts, or returns false
+            };
+
+            if !recipient_allowed {
+                env.events().publish(
+                    (symbol_short!("pay_block"), symbol_short!("pol_rcp")),
+                    (sender.clone(), recipient.clone(), amount),
+                );
+                return Err(PaymentError::PolicyDenied);
+            }
         }
 
         let spend_cap: i128 = env

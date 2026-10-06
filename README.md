@@ -111,10 +111,8 @@ registries, and exposes `evaluate()` and `is_authorized()`. Its decision logic
 comes from the pure-Rust **`safeguard-core`** crate, so the same rules can be
 tested off-chain and reproduced byte-for-byte in the docs site demo.
 
-> [!NOTE]
-> The payments contract currently enforces its **own** denylist and spend cap.
-> Calling `SafeguardPolicy.evaluate()` from inside `pay()` is the top roadmap
-> item. See [Project status and roadmap](#project-status-and-roadmap).
+> [!TIP]
+> **Cross-Contract Policy Wiring Active:** `SafeguardPayments` supports direct on-chain policy enforcement via `set_policy_contract(policy)`. When configured, `pay()` automatically verifies both `sender` and `recipient` authorizations in-transaction against `SafeguardPolicy::is_authorized()`, failing closed (`PaymentError::PolicyDenied` #7) if either party is unverified, restricted, or sanctioned.
 
 ## Repository layout
 
@@ -136,13 +134,16 @@ safeguard-contracts/
 | Function | Auth | Description |
 | :--- | :--- | :--- |
 | `initialize(admin, escrow_period: u64, spend_cap: i128)` | — | One-time setup. Fails with `AlreadyInitialized` (#2) if called again. |
-| `pay(sender, recipient, token, amount: i128) -> PaymentReceipt` | `sender` | Guarded payment: settles directly, escrows, or reverts. |
+| `pay(sender, recipient, token, amount: i128) -> PaymentReceipt` | `sender` | Guarded payment: verifies parties against policy, settles directly, escrows, or reverts. |
+| `set_policy_contract(policy_address)` | admin | Wires the external `SafeguardPolicy` contract for in-transaction screening. |
+| `get_policy_contract() -> Option<Address>` | — | Queries the currently wired policy contract address. |
+| `remove_policy_contract()` | admin | Disables external policy screening (falls back to native denylist). |
 | `release_escrow(escrow_id: u64)` | admin | Sends escrowed funds to the recipient. |
 | `refund_escrow(caller, escrow_id: u64)` | `caller` | Returns escrowed funds to the sender once the timelock has passed (#10 before that). |
 | `get_escrow(escrow_id) -> EscrowRecord` | — | Reads an escrow record (#8 if missing). |
 | `get_config() -> (admin, spend_cap, escrow_period, paused, total_escrows)` | — | Reads the current configuration. |
 | `set_spend_cap(new_cap)` | admin | Updates the escrow threshold. |
-| `add_to_denylist(address)` / `remove_from_denylist(address)` | admin | Manages the denylist. |
+| `add_to_denylist(address)` / `remove_from_denylist(address)` | admin | Manages the fallback denylist. |
 | `is_denylisted(address) -> bool` | — | Checks whether an address is denylisted. |
 | `set_paused(paused: bool)` | admin | Emergency stop for `pay`. |
 | `set_admin(new_admin)` | admin | Transfers the admin role. |
@@ -197,7 +198,7 @@ and numbers are never reused.
 | 4 | `ContractPaused` | `pay` while paused |
 | 5 | `InvalidAmount` | `amount <= 0` |
 | 6 | `SpendCapExceeded` | Used as `reason_code` on escrowed receipts |
-| 7 | `PolicyDenied` | Reserved for policy-contract integration |
+| 7 | `PolicyDenied` | Sender or recipient denied by wired PolicyContract |
 | 8 | `EscrowNotFound` | Unknown `escrow_id` |
 | 9 | `EscrowAlreadySettled` | Released / refunded twice |
 | 10 | `EscrowTimelockActive` | Refund before `release_after` |
@@ -221,10 +222,12 @@ and numbers are never reused.
 
 </details>
 
-The SDK in `safeguard-backend` also ships a broader 272-entry catalog
-([`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)) for integrators. Use it for
-human-readable messages; the tables above are the source of truth for on-chain
-codes.
+### Two-Tier Error Architecture
+
+To prevent bytecode bloat on-chain while providing institutional-grade diagnostic granularity, Safeguard separates errors into two distinct layers:
+
+1. **On-Chain WASM Execution Errors (22 codes total):** The tables above define the 12 `PaymentError` and 10 `ContractError` variants implemented directly in contract bytecode. This keeps WASM binaries compact (~58KB, well beneath the 256KB ledger cap) and gas consumption predictable.
+2. **Protocol Taxonomic Compliance Catalog (270 diagnostic codes):** Maintained in `safeguard-core::error_catalog` and the SDK ([`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)). These cover 9 regulatory domains (Identity, Sanctions, Jurisdiction, Velocity, Travel Rule, Thresholds, Escrow, Auth, Policy Lifecycle) for off-chain indexing, pre-flight simulation, and compliance audit reporting.
 
 ## Getting started
 

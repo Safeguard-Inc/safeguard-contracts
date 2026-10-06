@@ -1,6 +1,6 @@
 //! # safeguard-core
 //!
-//! Deterministic compliance policy engine for Stellar Confidential Tokens.
+//! Deterministic compliance policy engine for Stellar tokens (SEP-41 SAC today, architected for future Soroban confidential standards).
 //!
 //! This crate is the **definition layer** of the Safeguard polyrepo family:
 //! it decides what compliance rules apply to an account, token and

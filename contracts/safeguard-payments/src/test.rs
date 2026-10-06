@@ -226,3 +226,107 @@ fn test_gas_and_cpu_benchmarks() {
     client.add_to_denylist(&recipient);
     assert!(client.is_denylisted(&recipient));
 }
+
+#[contract]
+struct MockPolicy;
+
+#[contractimpl]
+impl MockPolicy {
+    pub fn is_authorized(env: Env, account: Address, _token: Address) -> bool {
+        let denied: Option<Address> = env.storage().instance().get(&symbol_short!("deny"));
+        if let Some(bad_acct) = denied {
+            if account == bad_acct {
+                return false;
+            }
+        }
+        true
+    }
+
+    pub fn set_deny(env: Env, account: Address) {
+        env.storage()
+            .instance()
+            .set(&symbol_short!("deny"), &account);
+    }
+}
+
+#[test]
+fn test_policy_contract_registration() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    let policy_id = env.register(MockPolicy, ());
+
+    client.initialize(&admin, &3600, &1000_0000000);
+    assert_eq!(client.get_policy_contract(), None);
+
+    client.set_policy_contract(&policy_id);
+    assert_eq!(client.get_policy_contract(), Some(policy_id.clone()));
+
+    client.remove_policy_contract();
+    assert_eq!(client.get_policy_contract(), None);
+}
+
+#[test]
+fn test_cross_contract_policy_approves_payment() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &1000_0000000);
+
+    // Register MockPolicy and wire it
+    let policy_id = env.register(MockPolicy, ());
+    client.set_policy_contract(&policy_id);
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &500_0000000);
+
+    // Both parties authorized -> direct pay approved
+    let receipt = client.pay(&sender, &recipient, &token_client.address, &100_0000000);
+    assert_eq!(receipt.status, PaymentStatus::Approved);
+    assert_eq!(token_client.balance(&recipient), 100_0000000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #7)")] // PolicyDenied = 7
+fn test_cross_contract_policy_denies_unauthorized_party() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &1000_0000000);
+
+    // Register MockPolicy, deny recipient, and wire it
+    let policy_id = env.register(MockPolicy, ());
+    let mock_client = MockPolicyClient::new(&env, &policy_id);
+    mock_client.set_deny(&recipient);
+
+    client.set_policy_contract(&policy_id);
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &500_0000000);
+
+    // Should revert with PolicyDenied (code 7)
+    client.pay(&sender, &recipient, &token_client.address, &100_0000000);
+}

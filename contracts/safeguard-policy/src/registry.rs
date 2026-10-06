@@ -1,6 +1,6 @@
 //! Policy↔token registry.
 //!
-//! A compliance policy applies only to the Confidential Tokens it has been
+//! A compliance policy applies only to the tokens (SAC or future confidential tokens) it has been
 //! explicitly bound to. This prevents one policy from accidentally governing
 //! unrelated assets and lets `evaluate` reject subjects whose token is not
 //! covered:
