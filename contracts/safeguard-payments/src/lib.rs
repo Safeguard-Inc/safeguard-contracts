@@ -318,17 +318,18 @@ impl SafeguardPayments {
             return Err(PaymentError::EscrowAlreadySettled);
         }
 
+        // Effects before interactions: mark settled, then transfer.
+        record.status = EscrowStatus::Released;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &record);
+
         let token_client = token::Client::new(&env, &record.token);
         token_client.transfer(
             &env.current_contract_address(),
             &record.recipient,
             &record.amount,
         );
-
-        record.status = EscrowStatus::Released;
-        env.storage()
-            .persistent()
-            .set(&DataKey::Escrow(escrow_id), &record);
 
         env.events().publish(
             (symbol_short!("esc_rel"),),
@@ -365,17 +366,18 @@ impl SafeguardPayments {
             }
         }
 
+        // Effects before interactions: mark settled, then transfer.
+        record.status = EscrowStatus::Refunded;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &record);
+
         let token_client = token::Client::new(&env, &record.token);
         token_client.transfer(
             &env.current_contract_address(),
             &record.sender,
             &record.amount,
         );
-
-        record.status = EscrowStatus::Refunded;
-        env.storage()
-            .persistent()
-            .set(&DataKey::Escrow(escrow_id), &record);
 
         env.events().publish(
             (symbol_short!("esc_ref"),),

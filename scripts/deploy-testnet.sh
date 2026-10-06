@@ -47,17 +47,26 @@ PAYMENTS_CONTRACT_ID=$(stellar contract deploy \
 
 echo "--> Payments Contract Deployed ID: $PAYMENTS_CONTRACT_ID"
 
-# 5. Initialize Payments Contract
+# 5. Initialize both contracts
 ADMIN_ADDR=$(stellar keys address "$IDENTITY")
-SPEND_CAP="1000000000" # 100 XLM / tokens (in 7 decimals)
+SPEND_CAP="1000000000"      # 100 tokens at 7 decimals
+ESCROW_PERIOD="86400"       # 24h refund timelock (seconds)
 
-echo "==> [4/4] Initializing safeguard-payments with Admin ($ADMIN_ADDR) and Spend Cap ($SPEND_CAP)..."
+echo "==> [4/4] Initializing contracts with Admin ($ADMIN_ADDR)..."
+stellar contract invoke \
+  --id "$POLICY_CONTRACT_ID" \
+  --source "$IDENTITY" \
+  --network "$NETWORK" \
+  -- initialize \
+  --admin "$ADMIN_ADDR"
+
 stellar contract invoke \
   --id "$PAYMENTS_CONTRACT_ID" \
   --source "$IDENTITY" \
   --network "$NETWORK" \
-  -- init \
+  -- initialize \
   --admin "$ADMIN_ADDR" \
+  --escrow_period "$ESCROW_PERIOD" \
   --spend_cap "$SPEND_CAP"
 
 # Save deployment artifact

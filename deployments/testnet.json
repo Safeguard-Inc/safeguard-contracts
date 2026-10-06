@@ -1,24 +1,31 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "Safeguard Inc. Stellar Testnet Deployment",
   "network": "testnet",
   "rpcUrl": "https://soroban-testnet.stellar.org",
   "networkPassphrase": "Test SDF Network ; September 2015",
   "explorerBaseUrl": "https://stellar.expert/explorer/testnet/contract/",
+  "deployedAt": "2026-10-05T20:57:00Z",
+  "deployedWith": "stellar-cli 28.1.0 via scripts/deploy-testnet.sh",
   "contracts": {
     "safeguardPolicy": {
-      "id": "CAQI3YI244YV7QGZ5VODUUGKFX6C4XNDQ2Y64K7Z5OC66UDF4RAGRP4V",
-      "wasmHash": "d54d7fe7b4e89bbff7301cbf5d04584ad5215c0e0b3c1ee55dfdfc54a868420e",
-      "type": "PolicyEngine",
-      "status": "active"
+      "id": "CCXFDOLLLFZKAG7X6AKN2YLKET5F5X565IHZXPOAGCM7W6MJG5WKANLN",
+      "wasm": "target/wasm32v1-none/release/safeguard_policy.wasm",
+      "wasmSha256": "4721e38306848d50a5ed0106eb3054cf2bd787983587b54a4814547ef38c8385",
+      "wasmBytes": 56262,
+      "initialized": { "admin": "GC5MCMHHMFV7GOQ7DVN7MOTMHGTMVIP3YFQAAVFZ6WKUE6SLGQBVODW4" },
+      "verified": "admin() and schema_version() == 1 read back from the live ledger after deploy"
     },
     "safeguardPayments": {
-      "id": "CBH4XG6K5XJHY3QMVUP7LGB4BFFG4C3XQ5Z64K7Z5OC66UDF4RAGRXYZ",
-      "wasmHash": "f83a21852c92e92c23fa4d173c3ee67bf8561c28c8ef4a1d48c8bcfec3907c0a",
-      "type": "EscrowPaymentGateway",
-      "status": "active",
-      "spendCap": "1000000000",
-      "divertEscrowCap": "1000000000"
+      "id": "CDC6KVX7QT7CD3GOVGX44NQUNS7FMSZKIAXTV3TDGSXQKJRQMDZRSRCN",
+      "wasm": "target/wasm32v1-none/release/safeguard_payments.wasm",
+      "wasmSha256": "66c0e1840b845436f93a8161bf2494bf0e24c07314db101b4257b61e60458156",
+      "wasmBytes": 25881,
+      "initialized": {
+        "admin": "GC5MCMHHMFV7GOQ7DVN7MOTMHGTMVIP3YFQAAVFZ6WKUE6SLGQBVODW4",
+        "escrowPeriodSeconds": 86400,
+        "spendCap": "1000000000"
+      },
+      "verified": "initialize() emitted the init event on the live ledger"
     },
     "nativeAssetContract": {
       "id": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
@@ -27,7 +34,6 @@
     }
   },
   "roles": {
-    "admin": "GDIYQ7X5E22P3H75YQ7LOUXFX6C4XNDQ2Y64K7Z5OC66UDF4RAGRP4V",
-    "treasury": "GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAUKCMUQAXEKSEPY52LAB2B"
+    "admin": "GC5MCMHHMFV7GOQ7DVN7MOTMHGTMVIP3YFQAAVFZ6WKUE6SLGQBVODW4"
   }
 }
