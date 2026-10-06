@@ -1,6 +1,6 @@
 # Contributing to Safeguard Contracts
 
-Thank you for your interest in contributing to Safeguard Contracts! We actively participate in the **Stellar Drips Wave** ecosystem sprints.
+Thank you for your interest in contributing to Safeguard Contracts! We welcome community contributions, bug reports, and pull requests.
 
 ## Development Workflow
 
@@ -25,8 +25,8 @@ Thank you for your interest in contributing to Safeguard Contracts! We actively 
    * Linting: `cargo clippy --workspace --all-targets -- -D warnings`
    * Tests: `cargo test --workspace`
 
-## Drips Wave Issues
+## Community Backlog
 
-* All tasks for Drips Wave sprints are labeled with `Stellar Wave` and complexity indicators.
-* Please link the issue in your PR body (`Closes #123`).
-* PRs are reviewed and merged promptly during Wave sprints.
+* Open issues are categorized with complexity ratings (`trivial`, `small`, `medium`, `large`) and area labels.
+* Please link the relevant issue in your PR body (`Closes #123`).
+* PRs are reviewed and merged following standard automated CI and testing workflows.

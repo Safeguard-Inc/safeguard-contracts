@@ -29,7 +29,7 @@ rejected before any tokens move.
 - [Fees and benchmarks](#fees-and-benchmarks)
 - [Security model](#security-model)
 - [Project status and roadmap](#project-status-and-roadmap)
-- [Contributing (Stellar Drips Wave)](#contributing-stellar-drips-wave)
+- [Contributing](#contributing)
 - [License](#license)
 
 ---
@@ -301,9 +301,9 @@ Please report vulnerabilities privately as described in
 | 🔜 | Event schema doc and an indexer in `safeguard-backend` |
 | 🔜 | External audit before Mainnet |
 
-## Contributing (Stellar Drips Wave)
+## Contributing
 
-Safeguard takes part in the **Stellar Drips Wave**. Roadmap items are broken
+We welcome community contributions, bug reports, and optimizations. Roadmap items are broken
 into scoped issues with acceptance criteria and complexity labels:
 [browse open issues](https://github.com/Safeguard-Inc/safeguard-contracts/issues).
 
