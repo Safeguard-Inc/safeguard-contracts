@@ -330,3 +330,32 @@ fn test_cross_contract_policy_denies_unauthorized_party() {
     // Should revert with PolicyDenied (code 7)
     client.pay(&sender, &recipient, &token_client.address, &100_0000000);
 }
+
+#[test]
+fn test_batch_denylist_and_getters() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let spend_cap = 500_0000000i128;
+    client.initialize(&admin, &7200, &spend_cap);
+
+    assert_eq!(client.get_spend_cap(), spend_cap);
+    assert_eq!(client.get_escrow_count(), 0);
+
+    let addr1 = Address::generate(&env);
+    let addr2 = Address::generate(&env);
+    let mut addrs = soroban_sdk::Vec::new(&env);
+    addrs.push_back(addr1.clone());
+    addrs.push_back(addr2.clone());
+
+    client.add_to_denylist_batch(&addrs);
+
+    assert!(client.is_denylisted(&addr1));
+    assert!(client.is_denylisted(&addr2));
+
+    client.extend_ttl(&50_000, &150_000);
+}

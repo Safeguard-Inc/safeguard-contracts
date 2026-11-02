@@ -4,7 +4,7 @@
 
 use soroban_sdk::{
     contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env,
-    IntoVal, Symbol,
+    IntoVal, Symbol, Vec,
 };
 
 #[contracterror]
@@ -491,6 +491,39 @@ impl SafeguardPayments {
             .get(&DataKey::EscrowCounter)
             .unwrap_or(0);
         (admin, spend_cap, escrow_period, is_paused, total_escrows)
+    }
+
+    /// Add multiple addresses to the denylist in a single batch transaction.
+    pub fn add_to_denylist_batch(env: Env, addresses: Vec<Address>) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        for address in addresses.iter() {
+            env.storage()
+                .persistent()
+                .set(&DataKey::Denylist(address.clone()), &true);
+            env.events().publish((symbol_short!("deny_add"),), address);
+        }
+        Ok(())
+    }
+
+    /// Retrieve current spend cap.
+    pub fn get_spend_cap(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get(&DataKey::SpendCap)
+            .unwrap_or(0)
+    }
+
+    /// Retrieve total escrows count.
+    pub fn get_escrow_count(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&DataKey::EscrowCounter)
+            .unwrap_or(0)
+    }
+
+    /// Auto-extend instance storage TTL to prevent state archival.
+    pub fn extend_ttl(env: Env, threshold: u32, extend_to: u32) {
+        env.storage().instance().extend_ttl(threshold, extend_to);
     }
 
     fn require_admin(env: &Env) -> Result<(), PaymentError> {
