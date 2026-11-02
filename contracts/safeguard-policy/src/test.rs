@@ -1490,3 +1490,43 @@ fn test_policy_storage_ttl_extension() {
     // Call extend_instance_ttl
     client.extend_instance_ttl(&1000, &5000);
 }
+
+#[test]
+fn test_policies_count_tracks_registrations() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+
+    client.initialize(&admin);
+    assert_eq!(client.policies_count(), 0);
+
+    let policy_a = rid(&env, "POLICY-A");
+    let policy_b = rid(&env, "POLICY-B");
+
+    client.register_version(
+        &policy_a,
+        &1,
+        &config_hash(&env, 10),
+        &vec![&env],
+    );
+    assert_eq!(client.policies_count(), 1);
+
+    client.register_version(
+        &policy_a,
+        &2,
+        &config_hash(&env, 11),
+        &vec![&env],
+    );
+    assert_eq!(client.policies_count(), 1);
+
+    client.register_version(
+        &policy_b,
+        &1,
+        &config_hash(&env, 20),
+        &vec![&env],
+    );
+    assert_eq!(client.policies_count(), 2);
+}
