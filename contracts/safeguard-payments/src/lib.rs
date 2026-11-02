@@ -556,6 +556,19 @@ impl SafeguardPayments {
             .unwrap_or(0)
     }
 
+    /// Retrieve current admin address.
+    pub fn get_admin(env: Env) -> Option<Address> {
+        env.storage().instance().get(&DataKey::Admin)
+    }
+
+    /// Check if contract operations are paused.
+    pub fn is_paused(env: Env) -> bool {
+        env.storage()
+            .instance()
+            .get(&DataKey::IsPaused)
+            .unwrap_or(false)
+    }
+
     /// Auto-extend instance storage TTL to prevent state archival.
     pub fn extend_ttl(env: Env, threshold: u32, extend_to: u32) {
         env.storage().instance().extend_ttl(threshold, extend_to);
