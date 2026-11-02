@@ -414,3 +414,21 @@ fn test_negative_spend_cap_reverts() {
 
     client.initialize(&admin, &3600, &-100);
 }
+
+#[test]
+fn test_storage_ttl_extension() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &1000_0000000);
+
+    // Instance TTL extension succeeds
+    client.extend_instance_ttl(&1000, &5000);
+
+    // Non-existent escrow returns EscrowNotFound
+    let res = client.try_extend_escrow_ttl(&999, &1000, &5000);
+    assert_eq!(res, Err(Ok(PaymentError::EscrowNotFound)));
+}
