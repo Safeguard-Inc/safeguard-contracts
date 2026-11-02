@@ -84,6 +84,7 @@ enum DataKey {
     Allowlist(Address),
     RequireAllowlist,
     TotalVolume,
+    PaymentSequence,
 }
 
 #[contract]
@@ -119,6 +120,7 @@ impl SafeguardPayments {
         env.storage().instance().set(&DataKey::IsPaused, &false);
         env.storage().instance().set(&DataKey::EscrowCounter, &0u64);
         env.storage().instance().set(&DataKey::TotalVolume, &0i128);
+        env.storage().instance().set(&DataKey::PaymentSequence, &0u64);
         env.storage()
             .instance()
             .set(&DataKey::RequireAllowlist, &false);
@@ -377,6 +379,16 @@ impl SafeguardPayments {
             .instance()
             .set(&DataKey::TotalVolume, &(current_volume + amount));
 
+        // Increment payment sequence number
+        let current_seq: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PaymentSequence)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::PaymentSequence, &(current_seq + 1));
+
         // 3. Routing: direct vs escrow
         if amount > spend_cap {
             let token_client = token::Client::new(&env, &token);
@@ -603,6 +615,14 @@ impl SafeguardPayments {
         env.storage()
             .instance()
             .get(&DataKey::SpendCap)
+            .unwrap_or(0)
+    }
+
+    /// Retrieve total payments sequence number counter (number of processed payments).
+    pub fn get_payment_sequence(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&DataKey::PaymentSequence)
             .unwrap_or(0)
     }
 
