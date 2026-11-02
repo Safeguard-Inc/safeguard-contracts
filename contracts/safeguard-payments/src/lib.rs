@@ -532,6 +532,22 @@ impl SafeguardPayments {
             .ok_or(PaymentError::EscrowNotFound)
     }
 
+    /// Retrieve multiple escrow records in a single query invocation.
+    /// Non-existent IDs are omitted from the returned list.
+    pub fn get_escrows_batch(env: Env, escrow_ids: Vec<u64>) -> Vec<EscrowRecord> {
+        let mut results = Vec::new(&env);
+        for id in escrow_ids.iter() {
+            if let Some(record) = env
+                .storage()
+                .persistent()
+                .get::<_, EscrowRecord>(&DataKey::Escrow(id))
+            {
+                results.push_back(record);
+            }
+        }
+        results
+    }
+
     /// Read contract configuration.
     pub fn get_config(env: Env) -> (Address, i128, u64, bool, u64) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
