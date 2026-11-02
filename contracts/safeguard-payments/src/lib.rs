@@ -239,6 +239,28 @@ impl SafeguardPayments {
         Ok(())
     }
 
+    /// Extend the TTL of the contract's instance storage and code.
+    /// Can be called to ensure the contract remains live and accessible on ledger.
+    pub fn extend_instance_ttl(env: Env, threshold: u32, extend_to: u32) {
+        env.storage().instance().extend_ttl(threshold, extend_to);
+    }
+
+    /// Extend the TTL of an active escrow record in persistent storage.
+    /// Ensures escrow state cannot be archived before timelock expiry or settlement.
+    pub fn extend_escrow_ttl(
+        env: Env,
+        escrow_id: u64,
+        threshold: u32,
+        extend_to: u32,
+    ) -> Result<(), PaymentError> {
+        let key = DataKey::Escrow(escrow_id);
+        if !env.storage().persistent().has(&key) {
+            return Err(PaymentError::EscrowNotFound);
+        }
+        env.storage().persistent().extend_ttl(&key, threshold, extend_to);
+        Ok(())
+    }
+
     /// Execute a policy-guarded payment in a SEP-41 SAC token.
     ///
     /// Outcomes:
