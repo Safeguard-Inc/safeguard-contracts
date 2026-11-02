@@ -1475,3 +1475,18 @@ fn is_authorized_treats_an_expired_identity_as_unknown() {
     );
     assert!(client.is_authorized(&alice, &token));
 }
+
+#[test]
+fn test_policy_storage_ttl_extension() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+
+    client.initialize(&admin);
+
+    // Call extend_instance_ttl
+    client.extend_instance_ttl(&1000, &5000);
+}
