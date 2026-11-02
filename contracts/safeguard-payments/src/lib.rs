@@ -83,6 +83,7 @@ enum DataKey {
     Denylist(Address),
     Allowlist(Address),
     RequireAllowlist,
+    TotalVolume,
 }
 
 #[contract]
@@ -117,6 +118,7 @@ impl SafeguardPayments {
         env.storage().instance().set(&DataKey::SpendCap, &spend_cap);
         env.storage().instance().set(&DataKey::IsPaused, &false);
         env.storage().instance().set(&DataKey::EscrowCounter, &0u64);
+        env.storage().instance().set(&DataKey::TotalVolume, &0i128);
         env.storage()
             .instance()
             .set(&DataKey::RequireAllowlist, &false);
@@ -365,6 +367,16 @@ impl SafeguardPayments {
             .unwrap_or(i128::MAX);
         let timestamp = env.ledger().timestamp();
 
+        // Update cumulative payment volume
+        let current_volume: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalVolume)
+            .unwrap_or(0);
+        env.storage()
+            .instance()
+            .set(&DataKey::TotalVolume, &(current_volume + amount));
+
         // 3. Routing: direct vs escrow
         if amount > spend_cap {
             let token_client = token::Client::new(&env, &token);
@@ -591,6 +603,14 @@ impl SafeguardPayments {
         env.storage()
             .instance()
             .get(&DataKey::SpendCap)
+            .unwrap_or(0)
+    }
+
+    /// Retrieve total cumulative payment volume processed by the contract in stroops/token units.
+    pub fn get_total_volume(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get(&DataKey::TotalVolume)
             .unwrap_or(0)
     }
 
