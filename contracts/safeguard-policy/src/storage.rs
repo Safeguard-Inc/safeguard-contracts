@@ -52,6 +52,8 @@ pub enum DataKey {
     Authorities,
     /// instance: policy authorities (may activate/deactivate versions).
     PolicyAuthorities,
+    /// instance: count of distinct registered policies.
+    PoliciesCount,
     /// persistent: configuration record of a policy version.
     Version(VersionKey),
     /// persistent: the active version number of a policy.
@@ -180,6 +182,19 @@ pub fn set_policy_authorities(env: &Env, addresses: &Vec<Address>) {
     env.storage()
         .instance()
         .set(&DataKey::PolicyAuthorities, addresses);
+}
+
+pub fn policies_count(env: &Env) -> u32 {
+    env.storage()
+        .instance()
+        .get(&DataKey::PoliciesCount)
+        .unwrap_or(0)
+}
+
+pub fn increment_policies_count(env: &Env) -> u32 {
+    let next = policies_count(env) + 1;
+    env.storage().instance().set(&DataKey::PoliciesCount, &next);
+    next
 }
 
 // -------------------------------------------------------------- persistent

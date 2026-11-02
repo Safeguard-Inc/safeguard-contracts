@@ -68,7 +68,10 @@ pub fn register_version(
     // so the registry layer can reject binding tokens to a policy that was
     // never created (append-only history means this is written exactly
     // once per policy).
-    storage::set_policy_exists(env, policy_id);
+    if !storage::policy_exists(env, policy_id) {
+        storage::set_policy_exists(env, policy_id);
+        storage::increment_policies_count(env);
+    }
 
     storage::set_version_record(
         env,

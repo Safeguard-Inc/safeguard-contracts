@@ -144,6 +144,11 @@ impl PolicyContract {
         lifecycle::get_active_version(&env, &policy_id)
     }
 
+    /// Retrieve total count of distinct registered policies (public read).
+    pub fn policies_count(env: Env) -> u32 {
+        storage::policies_count(&env)
+    }
+
     // ---------------------------------------------------------------- tokens
 
     /// Bind a token to a policy. Admin or registry authority. Idempotent.
