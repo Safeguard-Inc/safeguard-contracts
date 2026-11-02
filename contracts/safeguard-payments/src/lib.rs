@@ -24,6 +24,7 @@ pub enum PaymentError {
     RecipientDenylisted = 11,
     SenderDenylisted = 12,
     PendingAdminNotFound = 13,
+    InvalidEscrowPeriod = 14,
 }
 
 #[contracttype]
@@ -101,6 +102,13 @@ impl SafeguardPayments {
         }
 
         admin.require_auth();
+
+        if escrow_period == 0 {
+            return Err(PaymentError::InvalidEscrowPeriod);
+        }
+        if spend_cap < 0 {
+            return Err(PaymentError::InvalidAmount);
+        }
 
         env.storage().instance().set(&DataKey::Admin, &admin);
         env.storage()
