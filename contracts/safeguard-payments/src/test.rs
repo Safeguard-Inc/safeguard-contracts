@@ -359,3 +359,33 @@ fn test_batch_denylist_and_getters() {
 
     client.extend_ttl(&50_000, &150_000);
 }
+
+
+#[test]
+fn test_two_step_admin_transfer() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let new_admin = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &1000_0000000);
+
+    // Initial state: pending admin is None
+    assert_eq!(client.get_pending_admin(), None);
+
+    // Propose new admin
+    client.propose_admin(&new_admin);
+    assert_eq!(client.get_pending_admin(), Some(new_admin.clone()));
+
+    // Claim admin by new_admin
+    client.claim_admin();
+
+    // Verify admin is updated and pending is cleared
+    let (current_admin, _, _, _, _) = client.get_config();
+    assert_eq!(current_admin, new_admin);
+    assert_eq!(client.get_pending_admin(), None);
+}
