@@ -37,6 +37,12 @@ impl PolicyContract {
         1
     }
 
+    /// Extend the TTL of the policy contract instance storage and code.
+    /// Ensures policy registry and rule configurations remain live on ledger.
+    pub fn extend_instance_ttl(env: Env, threshold: u32, extend_to: u32) {
+        env.storage().instance().extend_ttl(threshold, extend_to);
+    }
+
     // ----------------------------------------------------------- bootstrap
 
     /// Initialize the contract with an administrator. Callable once.
