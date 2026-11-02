@@ -465,3 +465,31 @@ fn test_get_escrows_batch() {
     assert_eq!(batch.get(0).unwrap().id, receipt1.escrow_id);
     assert_eq!(batch.get(1).unwrap().id, receipt2.escrow_id);
 }
+
+#[test]
+fn test_cumulative_volume_tracking() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &100_0000000);
+
+    assert_eq!(client.get_total_volume(), 0);
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &10_000_0000000);
+
+    client.pay(&sender, &recipient, &token_client.address, &50_0000000);
+    assert_eq!(client.get_total_volume(), 50_0000000);
+
+    client.pay(&sender, &recipient, &token_client.address, &150_0000000);
+    assert_eq!(client.get_total_volume(), 200_0000000);
+}
