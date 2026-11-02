@@ -389,3 +389,30 @@ fn test_two_step_admin_transfer() {
     assert_eq!(current_admin, new_admin);
     assert_eq!(client.get_pending_admin(), None);
 }
+
+
+#[test]
+#[should_panic(expected = "Error(Contract, #14)")] // InvalidEscrowPeriod = 14
+fn test_zero_escrow_period_reverts() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+
+    client.initialize(&admin, &0, &1000_0000000);
+}
+
+#[test]
+#[should_panic(expected = "Error(Contract, #5)")] // InvalidAmount = 5
+fn test_negative_spend_cap_reverts() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &-100);
+}
