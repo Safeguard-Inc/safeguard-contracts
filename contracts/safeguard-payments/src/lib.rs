@@ -23,6 +23,7 @@ pub enum PaymentError {
     EscrowTimelockActive = 10,
     RecipientDenylisted = 11,
     SenderDenylisted = 12,
+    PendingAdminNotFound = 13,
 }
 
 #[contracttype]
@@ -71,6 +72,7 @@ pub struct EscrowRecord {
 #[derive(Clone)]
 enum DataKey {
     Admin,
+    PendingAdmin,
     PolicyContract,
     EscrowPeriod,
     EscrowCounter,
@@ -123,6 +125,39 @@ impl SafeguardPayments {
         env.storage().instance().set(&DataKey::Admin, &new_admin);
         env.events().publish((symbol_short!("set_adm"),), new_admin);
         Ok(())
+    }
+
+    /// Propose a new admin address (Step 1 of two-step admin handover).
+    pub fn propose_admin(env: Env, new_admin: Address) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        env.storage()
+            .instance()
+            .set(&DataKey::PendingAdmin, &new_admin);
+        env.events()
+            .publish((symbol_short!("prop_adm"),), new_admin);
+        Ok(())
+    }
+
+    /// Claim admin role (Step 2 of two-step admin handover).
+    /// Requires authorization from the proposed pending admin.
+    pub fn claim_admin(env: Env) -> Result<(), PaymentError> {
+        let pending: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::PendingAdmin)
+            .ok_or(PaymentError::PendingAdminNotFound)?;
+
+        pending.require_auth();
+
+        env.storage().instance().set(&DataKey::Admin, &pending);
+        env.storage().instance().remove(&DataKey::PendingAdmin);
+        env.events().publish((symbol_short!("set_adm"),), pending);
+        Ok(())
+    }
+
+    /// Retrieve currently proposed pending admin, if any.
+    pub fn get_pending_admin(env: Env) -> Option<Address> {
+        env.storage().instance().get(&DataKey::PendingAdmin)
     }
 
     /// Pause or unpause payment operations.
