@@ -1927,6 +1927,19 @@ pub fn lookup_error(code: u32) -> Option<&'static ErrorDetail> {
     ERROR_CATALOG.iter().find(|e| e.code == code)
 }
 
+/// Binary search lookup for canonical error codes in O(log n) time.
+pub fn lookup_by_code_fast(code: u32) -> Option<&'static ErrorDetail> {
+    ERROR_CATALOG
+        .binary_search_by_key(&code, |e| e.code)
+        .ok()
+        .map(|idx| &ERROR_CATALOG[idx])
+}
+
+/// Retrieve all error details belonging to a specific operational domain.
+pub fn lookup_by_domain(domain: ErrorDomain) -> impl Iterator<Item = &'static ErrorDetail> {
+    ERROR_CATALOG.iter().filter(move |e| e.domain == domain)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1952,5 +1965,21 @@ mod tests {
     fn test_lookup_error() {
         let err = lookup_error(2001).expect("code 2001 should exist");
         assert_eq!(err.mnemonic, "POLICY_NOT_FOUND");
+    }
+
+    #[test]
+    fn test_lookup_by_code_fast_matches_linear() {
+        for err in ERROR_CATALOG.iter() {
+            let fast = lookup_by_code_fast(err.code).expect("should find code");
+            assert_eq!(fast.code, err.code);
+            assert_eq!(fast.mnemonic, err.mnemonic);
+        }
+        assert!(lookup_by_code_fast(999999).is_none());
+    }
+
+    #[test]
+    fn test_lookup_by_domain() {
+        let count = lookup_by_domain(ErrorDomain::HostEnvironment).count();
+        assert!(count > 0);
     }
 }
