@@ -360,7 +360,6 @@ fn test_batch_denylist_and_getters() {
     client.extend_ttl(&50_000, &150_000);
 }
 
-
 #[test]
 fn test_two_step_admin_transfer() {
     let env = Env::default();
@@ -389,7 +388,6 @@ fn test_two_step_admin_transfer() {
     assert_eq!(current_admin, new_admin);
     assert_eq!(client.get_pending_admin(), None);
 }
-
 
 #[test]
 #[should_panic(expected = "Error(Contract, #14)")] // InvalidEscrowPeriod = 14
