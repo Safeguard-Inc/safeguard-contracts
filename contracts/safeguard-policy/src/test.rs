@@ -1530,3 +1530,41 @@ fn test_policies_count_tracks_registrations() {
     );
     assert_eq!(client.policies_count(), 2);
 }
+
+#[test]
+fn test_active_policy_query_entrypoints() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+
+    client.initialize(&admin);
+
+    let policy = rid(&env, "POL-QUERY-1");
+
+    // 1. Initially not active
+    assert_eq!(client.is_policy_active(&policy), false);
+    assert_eq!(client.get_active_version_number(&policy), None);
+
+    // 2. Register draft version 1
+    client.register_version(
+        &policy,
+        &1,
+        &config_hash(&env, 1),
+        &vec![&env],
+    );
+    assert_eq!(client.is_policy_active(&policy), false);
+    assert_eq!(client.get_active_version_number(&policy), None);
+
+    // 3. Activate version 1
+    client.activate_version(&admin, &policy, &1);
+    assert_eq!(client.is_policy_active(&policy), true);
+    assert_eq!(client.get_active_version_number(&policy), Some(1));
+
+    // 4. Deactivate version 1
+    client.deactivate_version(&admin, &policy, &1);
+    assert_eq!(client.is_policy_active(&policy), false);
+    assert_eq!(client.get_active_version_number(&policy), None);
+}
