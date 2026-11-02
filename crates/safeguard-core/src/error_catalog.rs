@@ -1940,6 +1940,11 @@ pub fn lookup_by_domain(domain: ErrorDomain) -> impl Iterator<Item = &'static Er
     ERROR_CATALOG.iter().filter(move |e| e.domain == domain)
 }
 
+/// Lookup error detail by mnemonic identifier case-insensitively.
+pub fn lookup_by_mnemonic(mnemonic: &str) -> Option<&'static ErrorDetail> {
+    ERROR_CATALOG.iter().find(|e| e.mnemonic.eq_ignore_ascii_case(mnemonic))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1975,6 +1980,13 @@ mod tests {
             assert_eq!(fast.mnemonic, err.mnemonic);
         }
         assert!(lookup_by_code_fast(999999).is_none());
+    }
+
+    #[test]
+    fn test_lookup_by_mnemonic() {
+        let err = lookup_by_mnemonic("policy_not_found").expect("should find policy_not_found");
+        assert_eq!(err.code, 2001);
+        assert!(lookup_by_mnemonic("NON_EXISTENT_MNEMONIC").is_none());
     }
 
     #[test]
