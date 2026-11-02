@@ -432,3 +432,36 @@ fn test_storage_ttl_extension() {
     let res = client.try_extend_escrow_ttl(&999, &1000, &5000);
     assert_eq!(res, Err(Ok(PaymentError::EscrowNotFound)));
 }
+
+#[test]
+fn test_get_escrows_batch() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &100_0000000);
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &10_000_0000000);
+
+    let receipt1 = client.pay(&sender, &recipient, &token_client.address, &200_0000000);
+    let receipt2 = client.pay(&sender, &recipient, &token_client.address, &300_0000000);
+
+    let mut query_ids = Vec::new(&env);
+    query_ids.push_back(receipt1.escrow_id);
+    query_ids.push_back(receipt2.escrow_id);
+    query_ids.push_back(9999u64);
+
+    let batch = client.get_escrows_batch(&query_ids);
+    assert_eq!(batch.len(), 2);
+    assert_eq!(batch.get(0).unwrap().id, receipt1.escrow_id);
+    assert_eq!(batch.get(1).unwrap().id, receipt2.escrow_id);
+}
