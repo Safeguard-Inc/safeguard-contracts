@@ -144,6 +144,16 @@ impl PolicyContract {
         lifecycle::get_active_version(&env, &policy_id)
     }
 
+    /// Check whether a policy currently has an active version (public read).
+    pub fn is_policy_active(env: Env, policy_id: BytesN<32>) -> bool {
+        storage::active_version(&env, &policy_id).is_some()
+    }
+
+    /// Retrieve the active version number of a policy if active (public read).
+    pub fn get_active_version_number(env: Env, policy_id: BytesN<32>) -> Option<u32> {
+        storage::active_version(&env, &policy_id)
+    }
+
     /// Retrieve total count of distinct registered policies (public read).
     pub fn policies_count(env: Env) -> u32 {
         storage::policies_count(&env)
