@@ -848,3 +848,38 @@ fn test_remove_batch_from_denylist() {
     assert!(!client.is_denylisted(&addr2));
     assert!(client.is_denylisted(&addr3));
 }
+
+#[test]
+fn test_get_denylist_batch() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &100_0000000);
+
+    let a1 = Address::generate(&env);
+    let a2 = Address::generate(&env);
+    let a3 = Address::generate(&env);
+    let a4 = Address::generate(&env);
+
+    let mut to_block = soroban_sdk::Vec::new(&env);
+    to_block.push_back(a2.clone());
+    to_block.push_back(a4.clone());
+    client.add_to_denylist_batch(&to_block);
+
+    let mut query = soroban_sdk::Vec::new(&env);
+    query.push_back(a1.clone());
+    query.push_back(a2.clone());
+    query.push_back(a3.clone());
+    query.push_back(a4.clone());
+
+    let results = client.get_denylist_batch(&query);
+    assert_eq!(results.len(), 4);
+    assert_eq!(results.get(0).unwrap(), false);
+    assert_eq!(results.get(1).unwrap(), true);
+    assert_eq!(results.get(2).unwrap(), false);
+    assert_eq!(results.get(3).unwrap(), true);
+}
