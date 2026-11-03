@@ -601,6 +601,18 @@ impl SafeguardPayments {
         results
     }
 
+    /// Check whether an escrow record exists and is currently in Pending status.
+    pub fn is_active_escrow(env: Env, escrow_id: u64) -> bool {
+        match env
+            .storage()
+            .persistent()
+            .get::<_, EscrowRecord>(&DataKey::Escrow(escrow_id))
+        {
+            Some(record) => record.status == EscrowStatus::Pending,
+            None => false,
+        }
+    }
+
     /// Read contract configuration.
     pub fn get_config(env: Env) -> (Address, i128, u64, bool, u64) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
