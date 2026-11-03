@@ -135,6 +135,21 @@ pub struct PaymentSequenceDetails {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GatewayTelemetrySnapshot {
+    pub current_sequence: u64,
+    pub total_escrows: u64,
+    pub total_volume: i128,
+    pub active_spend_cap: i128,
+    pub min_payment_amount: i128,
+    pub is_paused: bool,
+    pub paused_until: u64,
+    pub admin: Address,
+    pub guardian: Option<Address>,
+    pub policy_contract: Option<Address>,
+}
+
+#[contracttype]
 #[derive(Clone)]
 enum DataKey {
     Admin,
@@ -1643,6 +1658,46 @@ impl SafeguardPayments {
             is_paused,
             active_spend_cap,
         }
+    }
+
+    /// Aggregated operational and health telemetry snapshot for node indexers and compliance observers.
+    pub fn get_gateway_telemetry_snapshot(env: Env) -> Result<GatewayTelemetrySnapshot, PaymentError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(PaymentError::NotInitialized)?;
+        let guardian: Option<Address> = env.storage().instance().get(&DataKey::Guardian);
+        let policy_contract: Option<Address> = env.storage().instance().get(&DataKey::PolicyContract);
+
+        let current_sequence = Self::get_payment_sequence(env.clone());
+        let total_escrows = Self::get_escrow_count(env.clone());
+        let total_volume = Self::get_total_volume(env.clone());
+        let active_spend_cap = Self::get_spend_cap(env.clone());
+        let min_payment_amount: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::MinPaymentAmount)
+            .unwrap_or(0);
+        let is_paused = Self::is_paused(env.clone());
+        let paused_until: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PauseUntil)
+            .unwrap_or(0);
+
+        Ok(GatewayTelemetrySnapshot {
+            current_sequence,
+            total_escrows,
+            total_volume,
+            active_spend_cap,
+            min_payment_amount,
+            is_paused,
+            paused_until,
+            admin,
+            guardian,
+            policy_contract,
+        })
     }
 
     /// Retrieve total cumulative payment volume processed by the contract in stroops/token units.
