@@ -1948,3 +1948,43 @@ fn test_batch_has_role_and_metadata() {
     let updated_meta = client.get_metadata();
     assert_eq!(updated_meta.policies_count, 1);
 }
+
+#[test]
+fn test_bound_tokens_paged() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let policy_id = rid(&env, "paged-tokens-policy");
+    register_default_policy(&env, &client, &policy_id, 1);
+
+    let t1 = Address::generate(&env);
+    let t2 = Address::generate(&env);
+    let t3 = Address::generate(&env);
+
+    let tokens = vec![&env, t1.clone(), t2.clone(), t3.clone()];
+    client.batch_bind_tokens(&admin, &policy_id, &tokens);
+
+    // Page 1: offset 0, limit 2
+    let page1 = client.bound_tokens_paged(&policy_id, &0, &2);
+    assert_eq!(page1.len(), 2);
+    assert_eq!(page1.get(0).unwrap(), t1);
+    assert_eq!(page1.get(1).unwrap(), t2);
+
+    // Page 2: offset 2, limit 2
+    let page2 = client.bound_tokens_paged(&policy_id, &2, &2);
+    assert_eq!(page2.len(), 1);
+    assert_eq!(page2.get(0).unwrap(), t3);
+
+    // Out of bounds page: offset 5, limit 2
+    let page3 = client.bound_tokens_paged(&policy_id, &5, &2);
+    assert_eq!(page3.len(), 0);
+
+    // Zero limit
+    let page_zero = client.bound_tokens_paged(&policy_id, &0, &0);
+    assert_eq!(page_zero.len(), 0);
+}
