@@ -1795,3 +1795,42 @@ fn test_get_escrow_ids_by_status_paged() {
     assert_eq!(all_p2.len(), 1);
     assert_eq!(all_p2.get(0).unwrap(), e3.escrow_id);
 }
+
+#[test]
+fn test_get_gateway_telemetry_snapshot() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &200_0000000);
+
+    let guardian = Address::generate(&env);
+    client.set_guardian(&guardian);
+
+    let snap0 = client.get_gateway_telemetry_snapshot();
+    assert_eq!(snap0.admin, admin);
+    assert_eq!(snap0.guardian, Some(guardian));
+    assert_eq!(snap0.policy_contract, None);
+    assert_eq!(snap0.active_spend_cap, 200_0000000);
+    assert_eq!(snap0.current_sequence, 0);
+    assert_eq!(snap0.total_escrows, 0);
+    assert_eq!(snap0.total_volume, 0);
+    assert_eq!(snap0.is_paused, false);
+
+    // Process a payment
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &500_0000000);
+
+    client.pay(&sender, &recipient, &token_client.address, &50_0000000);
+
+    let snap1 = client.get_gateway_telemetry_snapshot();
+    assert_eq!(snap1.current_sequence, 1);
+    assert_eq!(snap1.total_volume, 50_0000000);
+}
