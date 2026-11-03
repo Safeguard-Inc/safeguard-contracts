@@ -954,6 +954,48 @@ impl SafeguardPayments {
         results
     }
 
+    /// Add an address to the gateway allowlist. Admin only.
+    pub fn add_to_allowlist(env: Env, address: Address) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Allowlist(address.clone()), &true);
+        env.events().publish((symbol_short!("allow_add"),), address);
+        Ok(())
+    }
+
+    /// Remove an address from the gateway allowlist. Admin only.
+    pub fn remove_from_allowlist(env: Env, address: Address) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Allowlist(address.clone()));
+        env.events().publish((symbol_short!("allow_rem"),), address);
+        Ok(())
+    }
+
+    /// Check if an address is on the gateway allowlist.
+    pub fn is_allowlisted(env: Env, address: Address) -> bool {
+        env.storage()
+            .persistent()
+            .get(&DataKey::Allowlist(address))
+            .unwrap_or(false)
+    }
+
+    /// Check whether multiple addresses are on the gateway allowlist in a single batch query.
+    pub fn get_allowlist_batch(env: Env, addresses: Vec<Address>) -> Vec<bool> {
+        let mut results = Vec::new(&env);
+        for address in addresses.iter() {
+            let is_allowed: bool = env
+                .storage()
+                .persistent()
+                .get(&DataKey::Allowlist(address))
+                .unwrap_or(false);
+            results.push_back(is_allowed);
+        }
+        results
+    }
+
     /// Retrieve current spend cap.
     pub fn get_spend_cap(env: Env) -> i128 {
         env.storage()
