@@ -521,3 +521,34 @@ fn test_payment_sequence_numbers() {
     client.pay(&sender, &recipient, &token_client.address, &500_0000000);
     assert_eq!(client.get_payment_sequence(), 2);
 }
+
+#[test]
+fn test_min_payment_threshold() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &100_0000000);
+
+    assert_eq!(client.get_min_payment_amount(), 1);
+
+    client.set_min_payment_amount(&10_0000000);
+    assert_eq!(client.get_min_payment_amount(), 10_0000000);
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &100_0000000);
+
+    let res = client.try_pay(&sender, &recipient, &token_client.address, &5_0000000);
+    assert_eq!(res, Err(Ok(PaymentError::InvalidAmount)));
+
+    let receipt = client.pay(&sender, &recipient, &token_client.address, &15_0000000);
+    assert_eq!(receipt.status, PaymentStatus::Approved);
+}
