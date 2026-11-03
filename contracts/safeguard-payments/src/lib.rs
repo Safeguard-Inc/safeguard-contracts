@@ -748,6 +748,29 @@ impl SafeguardPayments {
     }
 
     /// Read contract configuration.
+    /// Retrieve all escrow records currently in Disputed status awaiting arbitration.
+    pub fn get_disputed_escrows(env: Env) -> Vec<EscrowRecord> {
+        let total_escrows: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::EscrowCounter)
+            .unwrap_or(0);
+        let mut results = Vec::new(&env);
+
+        for id in 1..=total_escrows {
+            if let Some(record) = env
+                .storage()
+                .persistent()
+                .get::<_, EscrowRecord>(&DataKey::Escrow(id))
+            {
+                if record.status == EscrowStatus::Disputed {
+                    results.push_back(record);
+                }
+            }
+        }
+        results
+    }
+
     pub fn get_config(env: Env) -> (Address, i128, u64, bool, u64) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         let spend_cap: i128 = env
