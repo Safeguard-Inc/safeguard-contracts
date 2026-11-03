@@ -1114,3 +1114,55 @@ fn test_get_allowlist_batch() {
     assert_eq!(results2.get(0).unwrap(), false);
     assert_eq!(results2.get(1).unwrap(), true);
 }
+#[test]
+fn test_release_escrow_partial() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &200_0000000);
+
+    // Pay 100 -> Routed to escrow ID 1
+    let receipt = client.pay(&sender, &recipient, &token_client.address, &100_0000000);
+    assert_eq!(receipt.status, PaymentStatus::Escrowed);
+    assert_eq!(receipt.escrow_id, 1);
+
+    let initial_escrow = client.get_escrow(&1);
+    assert_eq!(initial_escrow.amount, 100_0000000);
+    assert_eq!(initial_escrow.status, EscrowStatus::Pending);
+
+    // 1. Partial release of 40
+    client.release_escrow_partial(&1, &40_0000000);
+    assert_eq!(token_client.balance(&recipient), 40_0000000);
+
+    let intermediate_escrow = client.get_escrow(&1);
+    assert_eq!(intermediate_escrow.amount, 60_0000000);
+    assert_eq!(intermediate_escrow.status, EscrowStatus::Pending);
+
+    // 2. Reject over-release (requesting 70 when only 60 remain)
+    let over_res = client.try_release_escrow_partial(&1, &70_0000000);
+    assert_eq!(over_res, Err(Ok(PaymentError::InvalidAmount)));
+
+    // 3. Final release of remaining 60
+    client.release_escrow_partial(&1, &60_0000000);
+    assert_eq!(token_client.balance(&recipient), 100_0000000);
+
+    let final_escrow = client.get_escrow(&1);
+    assert_eq!(final_escrow.amount, 0);
+    assert_eq!(final_escrow.status, EscrowStatus::Released);
+
+    // 4. Settled escrow cannot be released again
+    let settled_res = client.try_release_escrow_partial(&1, &10_0000000);
+    assert_eq!(settled_res, Err(Ok(PaymentError::EscrowAlreadySettled)));
+}
