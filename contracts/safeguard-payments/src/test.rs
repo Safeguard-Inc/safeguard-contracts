@@ -1662,3 +1662,43 @@ fn test_emergency_pause_with_duration() {
     assert_eq!(cleared_status.paused_until, 0);
     assert_eq!(cleared_status.paused_by, None);
 }
+
+#[test]
+fn test_get_payment_sequence_details() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &100_0000000);
+
+    let d0 = client.get_payment_sequence_details();
+    assert_eq!(d0.current_sequence, 0);
+    assert_eq!(d0.total_volume, 0);
+    assert_eq!(d0.min_payment_amount, 1);
+    assert_eq!(d0.is_paused, false);
+    assert_eq!(d0.active_spend_cap, 100_0000000);
+
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &500_0000000);
+
+    // Payment 1: approved
+    let r1 = client.pay(&sender, &recipient, &token_client.address, &20_0000000);
+    assert_eq!(r1.status, PaymentStatus::Approved);
+
+    // Payment 2: routed to escrow (exceeds 100 cap)
+    let r2 = client.pay(&sender, &recipient, &token_client.address, &150_0000000);
+    assert_eq!(r2.status, PaymentStatus::Escrowed);
+
+    let d1 = client.get_payment_sequence_details();
+    assert_eq!(d1.current_sequence, 2);
+    assert_eq!(d1.total_volume, 170_0000000);
+    assert_eq!(d1.is_paused, false);
+    assert_eq!(d1.active_spend_cap, 100_0000000);
+}
