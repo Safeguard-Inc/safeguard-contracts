@@ -1988,3 +1988,58 @@ fn test_bound_tokens_paged() {
     let page_zero = client.bound_tokens_paged(&policy_id, &0, &0);
     assert_eq!(page_zero.len(), 0);
 }
+
+#[test]
+fn test_batch_has_role_authority() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let reg_auth = Address::generate(&env);
+    client.add_authority(&reg_auth);
+
+    let pol_auth = Address::generate(&env);
+    client.add_policy_authority(&pol_auth);
+
+    let stranger = Address::generate(&env);
+
+    let accounts = vec![
+        &env,
+        admin.clone(),
+        reg_auth.clone(),
+        pol_auth.clone(),
+        stranger.clone(),
+    ];
+
+    // Role 1: Admin
+    let r1 = client.batch_has_role_authority(&1, &accounts);
+    assert_eq!(r1.get(0).unwrap(), true);
+    assert_eq!(r1.get(1).unwrap(), false);
+    assert_eq!(r1.get(2).unwrap(), false);
+    assert_eq!(r1.get(3).unwrap(), false);
+
+    // Role 2: Registry Authority (Admin or Registry Authority)
+    let r2 = client.batch_has_role_authority(&2, &accounts);
+    assert_eq!(r2.get(0).unwrap(), true); // Admin has registry authority powers
+    assert_eq!(r2.get(1).unwrap(), true); // reg_auth
+    assert_eq!(r2.get(2).unwrap(), false); // pol_auth does not have registry authority
+    assert_eq!(r2.get(3).unwrap(), false); // stranger
+
+    // Role 3: Policy Authority (Admin or Policy Authority)
+    let r3 = client.batch_has_role_authority(&3, &accounts);
+    assert_eq!(r3.get(0).unwrap(), true); // Admin has policy authority powers
+    assert_eq!(r3.get(1).unwrap(), false); // reg_auth does not have policy authority
+    assert_eq!(r3.get(2).unwrap(), true); // pol_auth
+    assert_eq!(r3.get(3).unwrap(), false); // stranger
+
+    // Role 4: Any Role
+    let r4 = client.batch_has_role_authority(&4, &accounts);
+    assert_eq!(r4.get(0).unwrap(), true);
+    assert_eq!(r4.get(1).unwrap(), true);
+    assert_eq!(r4.get(2).unwrap(), true);
+    assert_eq!(r4.get(3).unwrap(), false);
+}
