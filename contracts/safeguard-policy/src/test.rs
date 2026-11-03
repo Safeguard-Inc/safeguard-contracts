@@ -1605,3 +1605,45 @@ fn test_bound_tokens_count() {
     client.unbind_token(&admin, &policy, &token_a);
     assert_eq!(client.bound_tokens_count(&policy), 1);
 }
+
+#[test]
+fn test_batch_is_authorized() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+
+    client.initialize(&admin);
+
+    let policy = rid(&env, "POL-BATCH-AUTH");
+    client.register_version(
+        &policy,
+        &1,
+        &config_hash(&env, 1),
+        &vec![&env],
+    );
+    client.activate_version(&admin, &policy, &1);
+
+    let token = Address::generate(&env);
+    client.bind_token(&admin, &policy, &token);
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+
+    // Alice is active verified; Bob has no identity record
+    client.set_identity(&admin, &alice, &AccountStatus::Active.to_code(), &rid(&env, "ATT-ALICE"), &0);
+
+    let batch = vec![&env, alice.clone(), bob.clone()];
+    let results = client.batch_is_authorized(&batch, &token);
+
+    assert_eq!(results.len(), 2);
+    assert_eq!(results.get(0).unwrap(), true);
+    assert_eq!(results.get(1).unwrap(), false);
+
+    // Empty batch returns empty vector
+    let empty_batch = vec![&env];
+    let empty_results = client.batch_is_authorized(&empty_batch, &token);
+    assert_eq!(empty_results.len(), 0);
+}
