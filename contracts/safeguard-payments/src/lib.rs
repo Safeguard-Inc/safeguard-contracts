@@ -636,6 +636,29 @@ impl SafeguardPayments {
         results
     }
 
+    /// Retrieve all escrow records associated with a specific recipient address.
+    pub fn get_escrows_by_recipient(env: Env, recipient: Address) -> Vec<EscrowRecord> {
+        let total_escrows: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::EscrowCounter)
+            .unwrap_or(0);
+        let mut results = Vec::new(&env);
+
+        for id in 1..=total_escrows {
+            if let Some(record) = env
+                .storage()
+                .persistent()
+                .get::<_, EscrowRecord>(&DataKey::Escrow(id))
+            {
+                if record.recipient == recipient {
+                    results.push_back(record);
+                }
+            }
+        }
+        results
+    }
+
     /// Read contract configuration.
     pub fn get_config(env: Env) -> (Address, i128, u64, bool, u64) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
