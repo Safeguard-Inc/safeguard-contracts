@@ -287,6 +287,18 @@ impl PolicyContract {
         sanctions::sanctions_entry(&env, &subject_hash)
     }
 
+    /// Read sanctions records for multiple subject hashes in a single batch query.
+    pub fn batch_sanctions(
+        env: Env,
+        subject_hashes: Vec<BytesN<32>>,
+    ) -> Vec<Option<SanctionsEntryRecord>> {
+        let mut results = Vec::new(&env);
+        for hash in subject_hashes.iter() {
+            results.push_back(sanctions::sanctions_entry(&env, &hash));
+        }
+        results
+    }
+
     /// Set (or replace) an account's region classification.
     /// Admin or registry authority.
     pub fn set_jurisdiction(
