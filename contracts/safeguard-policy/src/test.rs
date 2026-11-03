@@ -1843,3 +1843,33 @@ fn test_batch_identity_expiry() {
     assert_eq!(results.get(2).unwrap(), Some(2_000_000_000));
     assert_eq!(results.get(3).unwrap(), None);
 }
+
+#[test]
+fn test_batch_bind_and_unbind_tokens() {
+    let env = Env::default();
+    let (admin, _authority, _, _, _, client) = setup(&env);
+    let policy_id = rid(&env, "POL-TOKENS");
+    register_default_policy(&env, &client, &policy_id, 1);
+
+    let t1 = Address::generate(&env);
+    let t2 = Address::generate(&env);
+    let t3 = Address::generate(&env);
+
+    assert_eq!(client.bound_tokens_count(&policy_id), 0);
+
+    // 1. Batch bind 3 tokens
+    let bind_tokens = vec![&env, t1.clone(), t2.clone(), t3.clone()];
+    let bound_count = client.batch_bind_tokens(&admin, &policy_id, &bind_tokens);
+    assert_eq!(bound_count, 3);
+    assert_eq!(client.bound_tokens_count(&policy_id), 3);
+
+    // 2. Batch unbind 2 tokens
+    let unbind_tokens = vec![&env, t1.clone(), t2.clone()];
+    let unbound_count = client.batch_unbind_tokens(&admin, &policy_id, &unbind_tokens);
+    assert_eq!(unbound_count, 2);
+    assert_eq!(client.bound_tokens_count(&policy_id), 1);
+
+    let remaining = client.bound_tokens(&policy_id);
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining.get(0).unwrap(), t3);
+}
