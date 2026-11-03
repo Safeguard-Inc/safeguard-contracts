@@ -259,6 +259,16 @@ impl PolicyContract {
         results
     }
 
+    /// Read identity expiration timestamps (`expires_at`) for multiple accounts in a single batch query.
+    pub fn batch_identity_expiry(env: Env, accounts: Vec<Address>) -> Vec<Option<u64>> {
+        let mut results = Vec::new(&env);
+        for account in accounts.iter() {
+            let expiry = identity::identity(&env, &account).map(|r| r.expires_at);
+            results.push_back(expiry);
+        }
+        results
+    }
+
     /// Write (or replace) a normalized sanctions entry for a subject hash.
     /// Admin or registry authority.
     #[allow(clippy::too_many_arguments)]
