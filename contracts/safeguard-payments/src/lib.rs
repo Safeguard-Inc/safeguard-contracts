@@ -85,6 +85,7 @@ enum DataKey {
     RequireAllowlist,
     TotalVolume,
     PaymentSequence,
+    MinPaymentAmount,
 }
 
 #[contract]
@@ -121,6 +122,7 @@ impl SafeguardPayments {
         env.storage().instance().set(&DataKey::EscrowCounter, &0u64);
         env.storage().instance().set(&DataKey::TotalVolume, &0i128);
         env.storage().instance().set(&DataKey::PaymentSequence, &0u64);
+        env.storage().instance().set(&DataKey::MinPaymentAmount, &1i128);
         env.storage()
             .instance()
             .set(&DataKey::RequireAllowlist, &false);
@@ -178,6 +180,28 @@ impl SafeguardPayments {
         env.storage().instance().set(&DataKey::IsPaused, &paused);
         env.events().publish((symbol_short!("paused"),), paused);
         Ok(())
+    }
+
+    /// Update minimum payment amount threshold (prevents dusting and sub-minimum spam).
+    pub fn set_min_payment_amount(env: Env, min_amount: i128) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        if min_amount < 0 {
+            return Err(PaymentError::InvalidAmount);
+        }
+        env.storage()
+            .instance()
+            .set(&DataKey::MinPaymentAmount, &min_amount);
+        env.events()
+            .publish((symbol_short!("set_min"),), min_amount);
+        Ok(())
+    }
+
+    /// Retrieve current minimum payment threshold.
+    pub fn get_min_payment_amount(env: Env) -> i128 {
+        env.storage()
+            .instance()
+            .get(&DataKey::MinPaymentAmount)
+            .unwrap_or(1)
     }
 
     /// Update spend cap (amounts exceeding this cap are routed to Escrow for review).
@@ -293,7 +317,12 @@ impl SafeguardPayments {
             return Err(PaymentError::ContractPaused);
         }
 
-        if amount <= 0 {
+        let min_amount: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::MinPaymentAmount)
+            .unwrap_or(1);
+        if amount < min_amount || amount <= 0 {
             return Err(PaymentError::InvalidAmount);
         }
 
