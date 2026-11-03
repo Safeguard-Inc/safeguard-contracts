@@ -75,6 +75,16 @@ pub struct EscrowRecord {
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EscrowMetrics {
+    pub total_escrows: u64,
+    pub pending_count: u64,
+    pub disputed_count: u64,
+    pub settled_count: u64,
+    pub total_locked_amount: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PaymentCheckParam {
     pub recipient: Address,
     pub token: Address,
@@ -958,6 +968,50 @@ impl SafeguardPayments {
         );
 
         Ok(())
+    }
+
+    /// Aggregated on-chain telemetry for all escrow records.
+    pub fn get_escrow_metrics(env: Env) -> EscrowMetrics {
+        let total_escrows: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::EscrowCounter)
+            .unwrap_or(0);
+
+        let mut pending_count = 0u64;
+        let mut disputed_count = 0u64;
+        let mut settled_count = 0u64;
+        let mut total_locked_amount = 0i128;
+
+        for id in 1..=total_escrows {
+            if let Some(record) = env
+                .storage()
+                .persistent()
+                .get::<_, EscrowRecord>(&DataKey::Escrow(id))
+            {
+                match record.status {
+                    EscrowStatus::Pending => {
+                        pending_count += 1;
+                        total_locked_amount += record.amount;
+                    }
+                    EscrowStatus::Disputed => {
+                        disputed_count += 1;
+                        total_locked_amount += record.amount;
+                    }
+                    EscrowStatus::Released | EscrowStatus::Refunded | EscrowStatus::Arbitrated => {
+                        settled_count += 1;
+                    }
+                }
+            }
+        }
+
+        EscrowMetrics {
+            total_escrows,
+            pending_count,
+            disputed_count,
+            settled_count,
+            total_locked_amount,
+        }
     }
 
     /// Retrieve an escrow record by ID.
