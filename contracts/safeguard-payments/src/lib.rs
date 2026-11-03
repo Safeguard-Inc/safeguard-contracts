@@ -101,6 +101,22 @@ pub struct PaymentSimulationVerdict {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PaymentGatewayConfig {
+    pub admin: Address,
+    pub pending_admin: Option<Address>,
+    pub policy_contract: Option<Address>,
+    pub guardian: Option<Address>,
+    pub escrow_period: u64,
+    pub spend_cap: i128,
+    pub min_payment_amount: i128,
+    pub is_paused: bool,
+    pub require_allowlist: bool,
+    pub total_volume: i128,
+    pub payment_sequence: u64,
+}
+
+#[contracttype]
 #[derive(Clone)]
 enum DataKey {
     Admin,
@@ -1068,6 +1084,40 @@ impl SafeguardPayments {
             settled_count,
             total_locked_amount,
         }
+    }
+
+    /// Telemetry and configuration query returning live operational parameters.
+    pub fn get_configuration(env: Env) -> Result<PaymentGatewayConfig, PaymentError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(PaymentError::Unauthorized)?;
+
+        let pending_admin: Option<Address> = env.storage().instance().get(&DataKey::PendingAdmin);
+        let policy_contract: Option<Address> = env.storage().instance().get(&DataKey::PolicyContract);
+        let guardian: Option<Address> = env.storage().instance().get(&DataKey::Guardian);
+        let escrow_period: u64 = env.storage().instance().get(&DataKey::EscrowPeriod).unwrap_or(0);
+        let spend_cap: i128 = env.storage().instance().get(&DataKey::SpendCap).unwrap_or(0);
+        let min_payment_amount: i128 = env.storage().instance().get(&DataKey::MinPaymentAmount).unwrap_or(0);
+        let is_paused: bool = env.storage().instance().get(&DataKey::IsPaused).unwrap_or(false);
+        let require_allowlist: bool = env.storage().instance().get(&DataKey::RequireAllowlist).unwrap_or(false);
+        let total_volume: i128 = env.storage().instance().get(&DataKey::TotalVolume).unwrap_or(0);
+        let payment_sequence: u64 = env.storage().instance().get(&DataKey::PaymentSequence).unwrap_or(0);
+
+        Ok(PaymentGatewayConfig {
+            admin,
+            pending_admin,
+            policy_contract,
+            guardian,
+            escrow_period,
+            spend_cap,
+            min_payment_amount,
+            is_paused,
+            require_allowlist,
+            total_volume,
+            payment_sequence,
+        })
     }
 
     /// Retrieve an escrow record by ID.
