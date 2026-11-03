@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, Env};
+use soroban_sdk::{testutils::Address as _, testutils::Ledger as _, Env};
 
 fn create_token_contract<'a>(e: &Env, admin: &Address) -> token::Client<'a> {
     let sac = e.register_stellar_asset_contract_v2(admin.clone());
@@ -1592,4 +1592,73 @@ fn test_active_escrows_paged() {
     // Zero limit
     let zero_page = client.get_active_escrows_paged(&0, &0);
     assert_eq!(zero_page.len(), 0);
+}
+
+#[test]
+fn test_emergency_pause_with_duration() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let guardian = Address::generate(&env);
+    client.set_guardian(&guardian);
+
+    let stranger = Address::generate(&env);
+
+    // Initial pause status is clean
+    let initial_status = client.get_pause_status();
+    assert_eq!(initial_status.is_paused, false);
+    assert_eq!(initial_status.paused_until, 0);
+    assert_eq!(initial_status.paused_by, None);
+
+    // Stranger cannot trigger emergency pause
+    let unauthorized_res = client.try_emergency_pause_with_duration(&stranger, &300);
+    assert_eq!(unauthorized_res, Err(Ok(PaymentError::Unauthorized)));
+
+    // Guardian triggers 300-second emergency pause
+    let start_ts = env.ledger().timestamp();
+    client.emergency_pause_with_duration(&guardian, &300);
+
+    let status = client.get_pause_status();
+    assert_eq!(status.is_paused, true);
+    assert_eq!(status.paused_until, start_ts + 300);
+    assert_eq!(status.paused_by, Some(guardian.clone()));
+    assert_eq!(client.is_paused(), true);
+
+    // While in the window, payments are blocked
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &500_0000000);
+
+    let pay_attempt = client.try_pay(&sender, &recipient, &token_client.address, &10_0000000);
+    assert_eq!(pay_attempt, Err(Ok(PaymentError::ContractPaused)));
+
+    // Advance timestamp past expiration window (start_ts + 301)
+    env.ledger().set_timestamp(start_ts + 301);
+
+    // Now auto-unpaused!
+    assert_eq!(client.is_paused(), false);
+    assert_eq!(client.get_pause_status().is_paused, false);
+
+    // Payment now succeeds
+    let pay_success = client.pay(&sender, &recipient, &token_client.address, &10_0000000);
+    assert_eq!(pay_success.status, PaymentStatus::Approved);
+
+    // Admin can emergency pause and manually unpause early
+    client.emergency_pause_with_duration(&admin, &5000);
+    assert_eq!(client.is_paused(), true);
+    client.set_paused(&false);
+    assert_eq!(client.is_paused(), false);
+    let cleared_status = client.get_pause_status();
+    assert_eq!(cleared_status.is_paused, false);
+    assert_eq!(cleared_status.paused_until, 0);
+    assert_eq!(cleared_status.paused_by, None);
 }
