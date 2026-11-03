@@ -792,6 +792,44 @@ impl SafeguardPayments {
         Ok(())
     }
 
+    /// Admin extends the dispute or release timelock (`release_after`) on an active escrow (Pending or Disputed).
+    /// Allows investigation or extended arbitration window without funds prematurely unlocking.
+    pub fn extend_dispute_period(
+        env: Env,
+        escrow_id: u64,
+        extension_seconds: u64,
+    ) -> Result<u64, PaymentError> {
+        Self::require_admin(&env)?;
+
+        if extension_seconds == 0 {
+            return Err(PaymentError::InvalidEscrowPeriod);
+        }
+
+        let mut record: EscrowRecord = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Escrow(escrow_id))
+            .ok_or(PaymentError::EscrowNotFound)?;
+
+        if record.status != EscrowStatus::Pending && record.status != EscrowStatus::Disputed {
+            return Err(PaymentError::EscrowAlreadySettled);
+        }
+
+        record.release_after += extension_seconds;
+        let new_release_after = record.release_after;
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &record);
+
+        env.events().publish(
+            (symbol_short!("esc_ext"), escrow_id),
+            (new_release_after, extension_seconds),
+        );
+
+        Ok(new_release_after)
+    }
+
     /// Refund an escrowed payment back to the sender.
     /// Can be initiated by admin immediately, or by the sender after `release_after` timelock.
     pub fn refund_escrow(env: Env, caller: Address, escrow_id: u64) -> Result<(), PaymentError> {
