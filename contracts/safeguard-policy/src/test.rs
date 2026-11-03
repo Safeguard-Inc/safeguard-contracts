@@ -1873,3 +1873,36 @@ fn test_batch_bind_and_unbind_tokens() {
     assert_eq!(remaining.len(), 1);
     assert_eq!(remaining.get(0).unwrap(), t3);
 }
+
+#[test]
+fn test_batch_authority_queries() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let reg_auth = Address::generate(&env);
+    let pol_auth = Address::generate(&env);
+    let stranger = Address::generate(&env);
+
+    client.add_authority(&reg_auth);
+    client.add_policy_authority(&pol_auth);
+
+    // 1. Batch registry authority check: admin=true, reg_auth=true, stranger=false
+    let addrs1 = vec![&env, admin.clone(), reg_auth.clone(), stranger.clone()];
+    let reg_results = client.batch_is_registry_authority(&addrs1);
+    assert_eq!(reg_results.len(), 3);
+    assert_eq!(reg_results.get(0).unwrap(), true);
+    assert_eq!(reg_results.get(1).unwrap(), true);
+    assert_eq!(reg_results.get(2).unwrap(), false);
+
+    // 2. Batch policy authority check: admin=true, pol_auth=true, stranger=false
+    let addrs2 = vec![&env, admin.clone(), pol_auth.clone(), stranger.clone()];
+    let pol_results = client.batch_is_policy_authority(&addrs2);
+    assert_eq!(pol_results.len(), 3);
+    assert_eq!(pol_results.get(0).unwrap(), true);
+    assert_eq!(pol_results.get(1).unwrap(), true);
+    assert_eq!(pol_results.get(2).unwrap(), false);
+}
