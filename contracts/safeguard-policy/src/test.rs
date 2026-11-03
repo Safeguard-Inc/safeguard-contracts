@@ -1705,3 +1705,36 @@ fn test_batch_jurisdiction() {
     assert_eq!(results.get(1).unwrap(), None);
     assert_eq!(results.get(2).unwrap(), Some(2));
 }
+
+#[test]
+fn test_authority_query_helpers() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let reg_auth = Address::generate(&env);
+    let pol_auth = Address::generate(&env);
+    let stranger = Address::generate(&env);
+
+    // Admin has both roles
+    assert!(client.is_registry_authority(&admin));
+    assert!(client.is_policy_authority(&admin));
+
+    // Register authority
+    client.add_authority(&reg_auth);
+    assert!(client.is_registry_authority(&reg_auth));
+    assert!(!client.is_policy_authority(&reg_auth));
+
+    // Policy authority
+    client.add_policy_authority(&pol_auth);
+    assert!(client.is_policy_authority(&pol_auth));
+    assert!(!client.is_registry_authority(&pol_auth));
+
+    // Stranger has neither
+    assert!(!client.is_registry_authority(&stranger));
+    assert!(!client.is_policy_authority(&stranger));
+}
