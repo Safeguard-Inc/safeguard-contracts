@@ -813,3 +813,38 @@ fn test_get_disputed_escrows() {
     assert_eq!(disputed_after.len(), 1);
     assert_eq!(disputed_after.get(0).unwrap().id, 3);
 }
+
+#[test]
+fn test_remove_batch_from_denylist() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &100_0000000);
+
+    let addr1 = Address::generate(&env);
+    let addr2 = Address::generate(&env);
+    let addr3 = Address::generate(&env);
+
+    let mut add_list = soroban_sdk::Vec::new(&env);
+    add_list.push_back(addr1.clone());
+    add_list.push_back(addr2.clone());
+    add_list.push_back(addr3.clone());
+
+    client.add_to_denylist_batch(&add_list);
+    assert!(client.is_denylisted(&addr1));
+    assert!(client.is_denylisted(&addr2));
+    assert!(client.is_denylisted(&addr3));
+
+    let mut remove_list = soroban_sdk::Vec::new(&env);
+    remove_list.push_back(addr1.clone());
+    remove_list.push_back(addr2.clone());
+
+    client.remove_from_denylist_batch(&remove_list);
+    assert!(!client.is_denylisted(&addr1));
+    assert!(!client.is_denylisted(&addr2));
+    assert!(client.is_denylisted(&addr3));
+}
