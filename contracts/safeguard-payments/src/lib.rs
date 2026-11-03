@@ -769,6 +769,69 @@ impl SafeguardPayments {
         Ok(())
     }
 
+    /// Admin arbitrates multiple disputed escrows in bulk.
+    /// If `release_to_recipient` is true, funds are paid to recipients; if false, refunded to senders.
+    pub fn batch_arbitrate_escrows(
+        env: Env,
+        escrow_ids: Vec<u64>,
+        release_to_recipient: bool,
+    ) -> Result<u32, PaymentError> {
+        Self::require_admin(&env)?;
+
+        let mut count = 0u32;
+        for id in escrow_ids.iter() {
+            let mut record: EscrowRecord = env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .ok_or(PaymentError::EscrowNotFound)?;
+
+            if record.status != EscrowStatus::Disputed {
+                return Err(PaymentError::EscrowAlreadySettled);
+            }
+
+            let token_client = token::Client::new(&env, &record.token);
+
+            if release_to_recipient {
+                record.status = EscrowStatus::Released;
+                env.storage()
+                    .persistent()
+                    .set(&DataKey::Escrow(id), &record);
+
+                token_client.transfer(
+                    &env.current_contract_address(),
+                    &record.recipient,
+                    &record.amount,
+                );
+
+                env.events().publish(
+                    (symbol_short!("esc_arb"), id),
+                    (record.recipient.clone(), record.amount, true),
+                );
+            } else {
+                record.status = EscrowStatus::Refunded;
+                env.storage()
+                    .persistent()
+                    .set(&DataKey::Escrow(id), &record);
+
+                token_client.transfer(
+                    &env.current_contract_address(),
+                    &record.sender,
+                    &record.amount,
+                );
+
+                env.events().publish(
+                    (symbol_short!("esc_arb"), id),
+                    (record.sender.clone(), record.amount, false),
+                );
+            }
+
+            count += 1;
+        }
+
+        Ok(count)
+    }
+
     /// Admin releases an escrowed payment to the recipient.
     pub fn release_escrow(env: Env, escrow_id: u64) -> Result<(), PaymentError> {
         Self::require_admin(&env)?;
