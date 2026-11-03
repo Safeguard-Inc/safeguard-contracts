@@ -1679,3 +1679,29 @@ fn test_batch_identity() {
     assert!(results.get(2).unwrap().is_some());
     assert_eq!(results.get(2).unwrap().unwrap().status, AccountStatus::Suspended.to_code());
 }
+
+#[test]
+fn test_batch_jurisdiction() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let a1 = Address::generate(&env);
+    let a2 = Address::generate(&env);
+    let a3 = Address::generate(&env);
+
+    client.set_jurisdiction(&admin, &a1, &1);
+    client.set_jurisdiction(&admin, &a3, &2);
+
+    let query = vec![&env, a1.clone(), a2.clone(), a3.clone()];
+    let results = client.batch_jurisdiction(&query);
+
+    assert_eq!(results.len(), 3);
+    assert_eq!(results.get(0).unwrap(), Some(1));
+    assert_eq!(results.get(1).unwrap(), None);
+    assert_eq!(results.get(2).unwrap(), Some(2));
+}
