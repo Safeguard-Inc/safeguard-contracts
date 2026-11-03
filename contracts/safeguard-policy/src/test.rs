@@ -1820,3 +1820,26 @@ fn test_batch_active_version() {
     assert_eq!(results.get(2).unwrap(), Some(2));
     assert_eq!(results.get(3).unwrap(), None);
 }
+
+#[test]
+fn test_batch_identity_expiry() {
+    let env = Env::default();
+    let (_admin, authority, _, _, _, client) = setup(&env);
+    let acc1 = Address::generate(&env);
+    let acc2 = Address::generate(&env);
+    let acc3 = Address::generate(&env);
+    let acc4 = Address::generate(&env);
+
+    client.set_identity(&authority, &acc1, &0, &rid(&env, "ATT-1"), &1_800_000_000);
+    client.set_identity(&authority, &acc2, &1, &rid(&env, "ATT-2"), &0);
+    client.set_identity(&authority, &acc3, &0, &rid(&env, "ATT-3"), &2_000_000_000);
+
+    let query = vec![&env, acc1.clone(), acc2.clone(), acc3.clone(), acc4.clone()];
+    let results = client.batch_identity_expiry(&query);
+
+    assert_eq!(results.len(), 4);
+    assert_eq!(results.get(0).unwrap(), Some(1_800_000_000));
+    assert_eq!(results.get(1).unwrap(), Some(0));
+    assert_eq!(results.get(2).unwrap(), Some(2_000_000_000));
+    assert_eq!(results.get(3).unwrap(), None);
+}
