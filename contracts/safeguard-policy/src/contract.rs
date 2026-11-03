@@ -380,4 +380,15 @@ impl PolicyContract {
             Err(_) => false,
         }
     }
+
+    /// Check compliance authorization for multiple accounts against a token in a single invocation.
+    /// Returns a Vec<bool> matching the input accounts slice order.
+    pub fn batch_is_authorized(env: Env, accounts: Vec<Address>, token: Address) -> Vec<bool> {
+        let mut results = Vec::new(&env);
+        for account in accounts.iter() {
+            let auth = Self::is_authorized(env.clone(), account, token.clone());
+            results.push_back(auth);
+        }
+        results
+    }
 }
