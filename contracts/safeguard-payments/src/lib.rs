@@ -529,6 +529,59 @@ impl SafeguardPayments {
         Ok(())
     }
 
+    /// Admin arbitrates a disputed escrow. Admin can route resolution either to the recipient or refund to the sender.
+    pub fn arbitrate_escrow(env: Env, escrow_id: u64, release_to_recipient: bool) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+
+        let mut record: EscrowRecord = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Escrow(escrow_id))
+            .ok_or(PaymentError::EscrowNotFound)?;
+
+        if record.status != EscrowStatus::Disputed {
+            return Err(PaymentError::EscrowAlreadySettled);
+        }
+
+        let token_client = token::Client::new(&env, &record.token);
+
+        if release_to_recipient {
+            record.status = EscrowStatus::Released;
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(escrow_id), &record);
+
+            token_client.transfer(
+                &env.current_contract_address(),
+                &record.recipient,
+                &record.amount,
+            );
+
+            env.events().publish(
+                (symbol_short!("esc_arb"), escrow_id),
+                (record.recipient.clone(), record.amount, true),
+            );
+        } else {
+            record.status = EscrowStatus::Refunded;
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(escrow_id), &record);
+
+            token_client.transfer(
+                &env.current_contract_address(),
+                &record.sender,
+                &record.amount,
+            );
+
+            env.events().publish(
+                (symbol_short!("esc_arb"), escrow_id),
+                (record.sender.clone(), record.amount, false),
+            );
+        }
+
+        Ok(())
+    }
+
     /// Admin releases an escrowed payment to the recipient.
     pub fn release_escrow(env: Env, escrow_id: u64) -> Result<(), PaymentError> {
         Self::require_admin(&env)?;
