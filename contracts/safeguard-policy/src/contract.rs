@@ -164,6 +164,18 @@ impl PolicyContract {
         storage::active_version(&env, &policy_id)
     }
 
+    /// Retrieve active version numbers for multiple policies in a single batch query (public read).
+    pub fn batch_active_version(
+        env: Env,
+        policy_ids: Vec<BytesN<32>>,
+    ) -> Vec<Option<u32>> {
+        let mut results = Vec::new(&env);
+        for id in policy_ids.iter() {
+            results.push_back(storage::active_version(&env, &id));
+        }
+        results
+    }
+
     /// Retrieve total count of distinct registered policies (public read).
     pub fn policies_count(env: Env) -> u32 {
         storage::policies_count(&env)
