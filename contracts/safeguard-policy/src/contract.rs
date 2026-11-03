@@ -186,6 +186,11 @@ impl PolicyContract {
         registry::bound_tokens(&env, &policy_id)
     }
 
+    /// The number of tokens currently bound to a policy (public read).
+    pub fn bound_tokens_count(env: Env, policy_id: BytesN<32>) -> u32 {
+        registry::bound_tokens_count(&env, &policy_id)
+    }
+
     // ------------------------------------------------------------ registries
 
     /// Write (or replace) an account's identity verification record.

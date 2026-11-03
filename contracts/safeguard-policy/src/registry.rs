@@ -103,3 +103,8 @@ pub fn bound_tokens(env: &Env, policy_id: &BytesN<32>) -> Vec<Address> {
 pub fn is_bound(env: &Env, policy_id: &BytesN<32>, token: &Address) -> bool {
     storage::token_bindings(env, policy_id).contains(token)
 }
+
+/// The number of tokens currently bound to a policy (public read).
+pub fn bound_tokens_count(env: &Env, policy_id: &BytesN<32>) -> u32 {
+    storage::token_bindings(env, policy_id).len()
+}
