@@ -178,6 +178,18 @@ impl SafeguardPayments {
         env.storage().instance().get(&DataKey::PendingAdmin)
     }
 
+    /// Cancel a pending admin handover proposal. Current admin only.
+    pub fn cancel_admin_transfer(env: Env) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        if env.storage().instance().has(&DataKey::PendingAdmin) {
+            env.storage().instance().remove(&DataKey::PendingAdmin);
+            env.events().publish((symbol_short!("cncl_adm"),), ());
+            Ok(())
+        } else {
+            Err(PaymentError::PendingAdminNotFound)
+        }
+    }
+
     /// Pause or unpause payment operations.
     pub fn set_paused(env: Env, paused: bool) -> Result<(), PaymentError> {
         Self::require_admin(&env)?;
