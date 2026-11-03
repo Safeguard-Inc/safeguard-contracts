@@ -12,7 +12,7 @@
 //! * `evaluate` — see [`crate::registry`] for request assembly and
 //!   [`safeguard-core::evaluator`] for the decision itself
 
-use soroban_sdk::{contract, contractimpl, Address, BytesN, Env, Vec};
+use soroban_sdk::{contract, contractimpl, contracttype, Address, BytesN, Env, Vec};
 
 use crate::admin;
 use crate::error::ContractError;
@@ -24,6 +24,16 @@ use crate::storage::{self, IdentityRecord, PolicyVersionRecord, RuleRecord, Sanc
 
 use safeguard_core::decision::Decision;
 use safeguard_core::rules::account_status::AccountStatus;
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PolicyContractMetadata {
+    pub schema_version: u32,
+    pub admin: Address,
+    pub policies_count: u32,
+    pub registry_authorities_count: u32,
+    pub policy_authorities_count: u32,
+}
 
 #[contract]
 pub struct PolicyContract;
@@ -119,6 +129,36 @@ impl PolicyContract {
             results.push_back(admin::is_admin_or_policy_authority(&env, &addr));
         }
         results
+    }
+
+    /// Checks in bulk whether each given address holds ANY administrative or authority role
+    /// (Admin, Registry Authority, or Policy Authority) on this policy contract.
+    pub fn batch_has_role(env: Env, accounts: Vec<Address>) -> Vec<bool> {
+        let admin_opt = Self::admin(env.clone()).ok();
+        let mut results = Vec::new(&env);
+        for acc in accounts.iter() {
+            let is_admin = admin_opt.as_ref().map_or(false, |a| *a == acc);
+            let has = is_admin
+                || Self::is_registry_authority(env.clone(), acc.clone())
+                || Self::is_policy_authority(env.clone(), acc.clone());
+            results.push_back(has);
+        }
+        results
+    }
+
+    /// Aggregated metadata telemetry query for this policy contract instance.
+    pub fn get_metadata(env: Env) -> Result<PolicyContractMetadata, ContractError> {
+        let admin = Self::admin(env.clone())?;
+        let reg_count = Self::authorities(env.clone()).len();
+        let pol_count = Self::policy_authorities(env.clone()).len();
+        let p_count = Self::policies_count(env.clone());
+        Ok(PolicyContractMetadata {
+            schema_version: 1,
+            admin,
+            policies_count: p_count,
+            registry_authorities_count: reg_count,
+            policy_authorities_count: pol_count,
+        })
     }
 
     // ------------------------------------------------------------- lifecycle
