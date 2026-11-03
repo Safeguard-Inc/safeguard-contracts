@@ -228,6 +228,15 @@ impl PolicyContract {
         identity::identity(&env, &account)
     }
 
+    /// Read normalized identity records for multiple accounts in a single query.
+    pub fn batch_identity(env: Env, accounts: Vec<Address>) -> Vec<Option<IdentityRecord>> {
+        let mut results = Vec::new(&env);
+        for account in accounts.iter() {
+            results.push_back(identity::identity(&env, &account));
+        }
+        results
+    }
+
     /// Write (or replace) a normalized sanctions entry for a subject hash.
     /// Admin or registry authority.
     #[allow(clippy::too_many_arguments)]
