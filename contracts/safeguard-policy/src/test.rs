@@ -1906,3 +1906,45 @@ fn test_batch_authority_queries() {
     assert_eq!(pol_results.get(1).unwrap(), true);
     assert_eq!(pol_results.get(2).unwrap(), false);
 }
+
+#[test]
+fn test_batch_has_role_and_metadata() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let reg_auth = Address::generate(&env);
+    let pol_auth = Address::generate(&env);
+    let stranger = Address::generate(&env);
+
+    client.add_authority(&reg_auth);
+    client.add_policy_authority(&pol_auth);
+
+    // Test batch_has_role: admin, reg_auth, pol_auth should have role; stranger should not
+    let accounts = vec![&env, admin.clone(), reg_auth.clone(), pol_auth.clone(), stranger.clone()];
+    let roles = client.batch_has_role(&accounts);
+    assert_eq!(roles.len(), 4);
+    assert_eq!(roles.get(0).unwrap(), true);
+    assert_eq!(roles.get(1).unwrap(), true);
+    assert_eq!(roles.get(2).unwrap(), true);
+    assert_eq!(roles.get(3).unwrap(), false);
+
+    // Initial metadata
+    let meta = client.get_metadata();
+    assert_eq!(meta.schema_version, 1);
+    assert_eq!(meta.admin, admin);
+    assert_eq!(meta.registry_authorities_count, 1);
+    assert_eq!(meta.policy_authorities_count, 1);
+    assert_eq!(meta.policies_count, 0);
+
+    // Register a policy to increment count
+    let policy_id = rid(&env, "meta-policy-01");
+    register_default_policy(&env, &client, &policy_id, 1);
+
+    let updated_meta = client.get_metadata();
+    assert_eq!(updated_meta.policies_count, 1);
+}
