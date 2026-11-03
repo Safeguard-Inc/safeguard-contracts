@@ -883,3 +883,31 @@ fn test_get_denylist_batch() {
     assert_eq!(results.get(2).unwrap(), false);
     assert_eq!(results.get(3).unwrap(), true);
 }
+
+#[test]
+fn test_cancel_admin_transfer() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &100_0000000);
+
+    let candidate = Address::generate(&env);
+    client.propose_admin(&candidate);
+    assert_eq!(client.get_pending_admin(), Some(candidate.clone()));
+
+    // Cancel proposal
+    client.cancel_admin_transfer();
+    assert_eq!(client.get_pending_admin(), None);
+
+    // Candidate cannot claim after cancellation
+    let res = client.try_claim_admin();
+    assert_eq!(res, Err(Ok(PaymentError::PendingAdminNotFound)));
+
+    // Cancelling when none pending fails
+    let res2 = client.try_cancel_admin_transfer();
+    assert_eq!(res2, Err(Ok(PaymentError::PendingAdminNotFound)));
+}
