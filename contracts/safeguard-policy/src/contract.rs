@@ -274,6 +274,15 @@ impl PolicyContract {
         storage::active_version(&env, &policy_id).is_some()
     }
 
+    /// Check whether multiple policy IDs currently have an active version in a single batch query.
+    pub fn batch_is_policy_active(env: Env, policy_ids: Vec<BytesN<32>>) -> Vec<bool> {
+        let mut results = Vec::new(&env);
+        for pid in policy_ids.iter() {
+            results.push_back(Self::is_policy_active(env.clone(), pid));
+        }
+        results
+    }
+
     /// Retrieve the active version number of a policy if active (public read).
     pub fn get_active_version_number(env: Env, policy_id: BytesN<32>) -> Option<u32> {
         storage::active_version(&env, &policy_id)
