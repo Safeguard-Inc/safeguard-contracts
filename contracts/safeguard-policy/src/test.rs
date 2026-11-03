@@ -1647,3 +1647,35 @@ fn test_batch_is_authorized() {
     let empty_results = client.batch_is_authorized(&empty_batch, &token);
     assert_eq!(empty_results.len(), 0);
 }
+
+#[test]
+fn test_batch_identity() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let alice = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let charlie = Address::generate(&env);
+
+    client.set_identity(&admin, &alice, &AccountStatus::Active.to_code(), &rid(&env, "ATT-ALICE"), &0);
+    client.set_identity(&admin, &charlie, &AccountStatus::Suspended.to_code(), &rid(&env, "ATT-CHARLIE"), &1_900_000_000);
+
+    let query = vec![&env, alice.clone(), bob.clone(), charlie.clone()];
+    let results = client.batch_identity(&query);
+
+    assert_eq!(results.len(), 3);
+    assert!(results.get(0).unwrap().is_some());
+    assert_eq!(results.get(0).unwrap().unwrap().status, AccountStatus::Active.to_code());
+
+    // Bob has no identity record
+    assert!(results.get(1).unwrap().is_none());
+
+    // Charlie has suspended identity record
+    assert!(results.get(2).unwrap().is_some());
+    assert_eq!(results.get(2).unwrap().unwrap().status, AccountStatus::Suspended.to_code());
+}
