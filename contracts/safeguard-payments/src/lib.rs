@@ -675,6 +675,47 @@ impl SafeguardPayments {
         Ok(())
     }
 
+    /// Raise a dispute across multiple active escrows in bulk.
+    /// Can only be invoked by a party (sender or recipient) of each escrow.
+    pub fn batch_dispute_escrows(
+        env: Env,
+        caller: Address,
+        escrow_ids: Vec<u64>,
+    ) -> Result<u32, PaymentError> {
+        caller.require_auth();
+
+        let mut count = 0u32;
+        for id in escrow_ids.iter() {
+            let mut record: EscrowRecord = env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .ok_or(PaymentError::EscrowNotFound)?;
+
+            if record.status != EscrowStatus::Pending {
+                return Err(PaymentError::EscrowAlreadySettled);
+            }
+
+            if caller != record.sender && caller != record.recipient {
+                return Err(PaymentError::InvalidDisputeParty);
+            }
+
+            record.status = EscrowStatus::Disputed;
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(id), &record);
+
+            env.events().publish(
+                (soroban_sdk::symbol_short!("esc_disp"), id),
+                (caller.clone(), record.amount),
+            );
+
+            count += 1;
+        }
+
+        Ok(count)
+    }
+
     /// Admin arbitrates a disputed escrow. Admin can route resolution either to the recipient or refund to the sender.
     pub fn arbitrate_escrow(env: Env, escrow_id: u64, release_to_recipient: bool) -> Result<(), PaymentError> {
         Self::require_admin(&env)?;
