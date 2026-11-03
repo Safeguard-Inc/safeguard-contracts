@@ -1280,7 +1280,7 @@ fn test_batch_release_escrows() {
     token_admin_client.mint(&sender, &500_0000000);
 
     // Create 2 escrows
-    let r1 = client.pay(&sender, &rec1, &token_client.address, &100_0000000);
+    let _r1 = client.pay(&sender, &rec1, &token_client.address, &100_0000000);
     let r2 = client.pay(&sender, &rec2, &token_client.address, &150_0000000);
 
     assert_eq!(token_client.balance(&rec1), 0);
@@ -1303,4 +1303,52 @@ fn test_batch_release_escrows() {
     // Settled escrows cannot be released again
     let settled_res = client.try_batch_release_escrows(&ids);
     assert_eq!(settled_res, Err(Ok(PaymentError::EscrowAlreadySettled)));
+}
+
+#[test]
+fn test_get_escrow_metrics() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let sender = Address::generate(&env);
+    let rec1 = Address::generate(&env);
+    let rec2 = Address::generate(&env);
+    let rec3 = Address::generate(&env);
+
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &1000_0000000);
+
+    // Initial metrics: all zero
+    let init_metrics = client.get_escrow_metrics();
+    assert_eq!(init_metrics.total_escrows, 0);
+    assert_eq!(init_metrics.pending_count, 0);
+    assert_eq!(init_metrics.disputed_count, 0);
+    assert_eq!(init_metrics.settled_count, 0);
+    assert_eq!(init_metrics.total_locked_amount, 0);
+
+    // Create 3 escrows
+    let _r1 = client.pay(&sender, &rec1, &token_client.address, &100_0000000);
+    let r2 = client.pay(&sender, &rec2, &token_client.address, &200_0000000);
+    let r3 = client.pay(&sender, &rec3, &token_client.address, &300_0000000);
+
+    // Put escrow 2 into Disputed status
+    client.dispute_escrow(&sender, &r2.escrow_id);
+
+    // Settle escrow 3 via release
+    client.release_escrow(&r3.escrow_id);
+
+    let metrics = client.get_escrow_metrics();
+    assert_eq!(metrics.total_escrows, 3);
+    assert_eq!(metrics.pending_count, 1);
+    assert_eq!(metrics.disputed_count, 1);
+    assert_eq!(metrics.settled_count, 1);
+    assert_eq!(metrics.total_locked_amount, 300_0000000); // 100 + 200
 }
