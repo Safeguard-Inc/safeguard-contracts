@@ -2043,3 +2043,52 @@ fn test_batch_has_role_authority() {
     assert_eq!(r4.get(2).unwrap(), true);
     assert_eq!(r4.get(3).unwrap(), false);
 }
+
+#[test]
+fn test_get_policy_version_details() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let policy_id = rid(&env, "details-test-policy");
+    let rules = vec![
+        &env,
+        RuleRecord {
+            rule_id: rid(&env, "RULE-A"),
+            rule_type: RuleType::Allowlist.to_code(),
+            action: RuleAction::Block.to_code(),
+        },
+        RuleRecord {
+            rule_id: rid(&env, "RULE-B"),
+            rule_type: RuleType::Jurisdiction.to_code(),
+            action: RuleAction::Flag.to_code(),
+        },
+    ];
+
+    client.register_version(&policy_id, &1, &config_hash(&env, 42), &rules);
+
+    let token = Address::generate(&env);
+    client.bind_token(&admin, &policy_id, &token);
+
+    // Initial draft details
+    let d1 = client.get_policy_version_details(&policy_id, &1);
+    assert_eq!(d1.policy_id, policy_id);
+    assert_eq!(d1.version, 1);
+    assert_eq!(d1.status, 0); // Draft
+    assert_eq!(d1.rules_count, 2);
+    assert_eq!(d1.bound_tokens_count, 1);
+    assert_eq!(d1.config_hash, config_hash(&env, 42));
+
+    // Activate version
+    client.activate_version(&admin, &policy_id, &1);
+    let d2 = client.get_policy_version_details(&policy_id, &1);
+    assert_eq!(d2.status, 1); // Active
+
+    // Non-existent version
+    let not_found = client.try_get_policy_version_details(&policy_id, &99);
+    assert_eq!(not_found, Err(Ok(ContractError::VersionNotFound)));
+}
