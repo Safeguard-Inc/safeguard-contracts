@@ -737,6 +737,61 @@ impl SafeguardPayments {
         Ok(())
     }
 
+    /// Admin partially releases an escrowed payment to the recipient.
+    /// If partial_amount == record.amount, marks the escrow as Released.
+    /// Otherwise, decrements the escrow record amount and transfers partial_amount to recipient,
+    /// keeping the escrow record active in Pending status.
+    pub fn release_escrow_partial(
+        env: Env,
+        escrow_id: u64,
+        partial_amount: i128,
+    ) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+
+        if partial_amount <= 0 {
+            return Err(PaymentError::InvalidAmount);
+        }
+
+        let mut record: EscrowRecord = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Escrow(escrow_id))
+            .ok_or(PaymentError::EscrowNotFound)?;
+
+        if record.status != EscrowStatus::Pending {
+            return Err(PaymentError::EscrowAlreadySettled);
+        }
+
+        if partial_amount > record.amount {
+            return Err(PaymentError::InvalidAmount);
+        }
+
+        if partial_amount == record.amount {
+            record.status = EscrowStatus::Released;
+            record.amount = 0;
+        } else {
+            record.amount -= partial_amount;
+        }
+
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &record);
+
+        let token_client = token::Client::new(&env, &record.token);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &record.recipient,
+            &partial_amount,
+        );
+
+        env.events().publish(
+            (symbol_short!("esc_part"),),
+            (escrow_id, record.recipient.clone(), partial_amount, record.amount),
+        );
+
+        Ok(())
+    }
+
     /// Refund an escrowed payment back to the sender.
     /// Can be initiated by admin immediately, or by the sender after `release_after` timelock.
     pub fn refund_escrow(env: Env, caller: Address, escrow_id: u64) -> Result<(), PaymentError> {
