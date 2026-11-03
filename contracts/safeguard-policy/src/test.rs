@@ -1568,3 +1568,40 @@ fn test_active_policy_query_entrypoints() {
     assert_eq!(client.is_policy_active(&policy), false);
     assert_eq!(client.get_active_version_number(&policy), None);
 }
+
+#[test]
+fn test_bound_tokens_count() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+
+    client.initialize(&admin);
+
+    let policy = rid(&env, "POL-TOKEN-COUNT");
+    client.register_version(
+        &policy,
+        &1,
+        &config_hash(&env, 1),
+        &vec![&env],
+    );
+
+    assert_eq!(client.bound_tokens_count(&policy), 0);
+
+    let token_a = Address::generate(&env);
+    let token_b = Address::generate(&env);
+
+    client.bind_token(&admin, &policy, &token_a);
+    assert_eq!(client.bound_tokens_count(&policy), 1);
+
+    client.bind_token(&admin, &policy, &token_a);
+    assert_eq!(client.bound_tokens_count(&policy), 1);
+
+    client.bind_token(&admin, &policy, &token_b);
+    assert_eq!(client.bound_tokens_count(&policy), 2);
+
+    client.unbind_token(&admin, &policy, &token_a);
+    assert_eq!(client.bound_tokens_count(&policy), 1);
+}
