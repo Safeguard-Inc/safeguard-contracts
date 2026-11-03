@@ -93,6 +93,16 @@ impl PolicyContract {
         admin::remove_policy_authority(&env, &authority)
     }
 
+    /// Check whether an address is an authorized registry operator (admin or registry authority).
+    pub fn is_registry_authority(env: Env, address: Address) -> bool {
+        admin::is_admin_or_authority(&env, &address)
+    }
+
+    /// Check whether an address is authorized for policy lifecycle operations (admin or policy authority).
+    pub fn is_policy_authority(env: Env, address: Address) -> bool {
+        admin::is_admin_or_policy_authority(&env, &address)
+    }
+
     // ------------------------------------------------------------- lifecycle
 
     /// Register a new draft version of a policy. Admin only; append-only.
