@@ -1488,3 +1488,51 @@ fn test_batch_dispute_escrows() {
     let reserialized = client.try_batch_dispute_escrows(&sender, &ids);
     assert_eq!(reserialized, Err(Ok(PaymentError::EscrowAlreadySettled)));
 }
+
+#[test]
+fn test_batch_arbitrate_escrows() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let sender = Address::generate(&env);
+    let rec1 = Address::generate(&env);
+    let rec2 = Address::generate(&env);
+
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &500_0000000);
+
+    // Create 2 escrows
+    let r1 = client.pay(&sender, &rec1, &token_client.address, &100_0000000);
+    let r2 = client.pay(&sender, &rec2, &token_client.address, &150_0000000);
+
+    let mut ids = Vec::new(&env);
+    ids.push_back(r1.escrow_id);
+    ids.push_back(r2.escrow_id);
+
+    // Dispute both escrows
+    client.batch_dispute_escrows(&sender, &ids);
+    assert_eq!(client.get_escrow(&r1.escrow_id).status, EscrowStatus::Disputed);
+    assert_eq!(client.get_escrow(&r2.escrow_id).status, EscrowStatus::Disputed);
+
+    // Since mock_all_auths is on, let's verify admin call succeeds
+    let arbitrated_count = client.batch_arbitrate_escrows(&ids, &true);
+    assert_eq!(arbitrated_count, 2);
+
+    // Both settled to Released and tokens received by recipients
+    assert_eq!(client.get_escrow(&r1.escrow_id).status, EscrowStatus::Released);
+    assert_eq!(client.get_escrow(&r2.escrow_id).status, EscrowStatus::Released);
+    assert_eq!(token_client.balance(&rec1), 100_0000000);
+    assert_eq!(token_client.balance(&rec2), 150_0000000);
+
+    // Subsequent arbitration fails
+    let reserialized = client.try_batch_arbitrate_escrows(&ids, &false);
+    assert_eq!(reserialized, Err(Ok(PaymentError::EscrowAlreadySettled)));
+}
