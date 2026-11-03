@@ -1738,3 +1738,52 @@ fn test_authority_query_helpers() {
     assert!(!client.is_registry_authority(&stranger));
     assert!(!client.is_policy_authority(&stranger));
 }
+
+#[test]
+fn test_batch_sanctions() {
+    use safeguard_core::registries::sanctions::SanctionsStatus;
+
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let h1 = BytesN::from_array(&env, &[1u8; 32]);
+    let h2 = BytesN::from_array(&env, &[2u8; 32]);
+    let h3 = BytesN::from_array(&env, &[3u8; 32]);
+
+    let list_id = BytesN::from_array(&env, &[9u8; 32]);
+    let source = Bytes::from_array(&env, b"OFAC SDN");
+
+    client.set_sanctions_entry(
+        &admin,
+        &h1,
+        &list_id,
+        &SanctionsStatus::Active.to_code(),
+        &1,
+        &100,
+        &source,
+    );
+    client.set_sanctions_entry(
+        &admin,
+        &h3,
+        &list_id,
+        &SanctionsStatus::Active.to_code(),
+        &2,
+        &200,
+        &source,
+    );
+
+    let query = vec![&env, h1.clone(), h2.clone(), h3.clone()];
+    let results = client.batch_sanctions(&query);
+
+    assert_eq!(results.len(), 3);
+    assert!(results.get(0).unwrap().is_some());
+    assert_eq!(results.get(0).unwrap().unwrap().status, SanctionsStatus::Active.to_code());
+    assert!(results.get(1).unwrap().is_none());
+    assert!(results.get(2).unwrap().is_some());
+    assert_eq!(results.get(2).unwrap().unwrap().dataset_version, 2);
+}
