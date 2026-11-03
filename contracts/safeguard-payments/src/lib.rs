@@ -108,6 +108,7 @@ enum DataKey {
     TotalVolume,
     PaymentSequence,
     MinPaymentAmount,
+    TokenSpendCap(Address),
 }
 
 #[contract]
@@ -277,6 +278,58 @@ impl SafeguardPayments {
             .instance()
             .get(&DataKey::MinPaymentAmount)
             .unwrap_or(1)
+    }
+
+    /// Set a token-specific spend cap. When set, payments in this token use this cap
+    /// instead of the global default spend cap. Admin only.
+    pub fn set_token_spend_cap(
+        env: Env,
+        token: Address,
+        cap: i128,
+    ) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        if cap < 0 {
+            return Err(PaymentError::InvalidAmount);
+        }
+        env.storage()
+            .persistent()
+            .set(&DataKey::TokenSpendCap(token.clone()), &cap);
+        env.events().publish((symbol_short!("t_cap_set"),), (token, cap));
+        Ok(())
+    }
+
+    /// Retrieve the effective spend cap for a token.
+    /// Returns the per-token spend cap if configured; otherwise falls back to global default.
+    pub fn get_effective_spend_cap(env: Env, token: Address) -> i128 {
+        if let Some(token_cap) = env
+            .storage()
+            .persistent()
+            .get::<_, i128>(&DataKey::TokenSpendCap(token))
+        {
+            token_cap
+        } else {
+            env.storage()
+                .instance()
+                .get(&DataKey::SpendCap)
+                .unwrap_or(i128::MAX)
+        }
+    }
+
+    /// Retrieve specifically configured token spend cap, without falling back.
+    pub fn get_token_spend_cap(env: Env, token: Address) -> Option<i128> {
+        env.storage()
+            .persistent()
+            .get(&DataKey::TokenSpendCap(token))
+    }
+
+    /// Remove a per-token spend cap override, restoring the global default cap.
+    pub fn remove_token_spend_cap(env: Env, token: Address) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        env.storage()
+            .persistent()
+            .remove(&DataKey::TokenSpendCap(token.clone()));
+        env.events().publish((symbol_short!("t_cap_rem"),), token);
+        Ok(())
     }
 
     /// Update spend cap (amounts exceeding this cap are routed to Escrow for review).
@@ -466,11 +519,7 @@ impl SafeguardPayments {
             }
         }
 
-        let spend_cap: i128 = env
-            .storage()
-            .instance()
-            .get(&DataKey::SpendCap)
-            .unwrap_or(i128::MAX);
+        let spend_cap = Self::get_effective_spend_cap(env.clone(), token.clone());
         let timestamp = env.ledger().timestamp();
 
         // Update cumulative payment volume
@@ -967,7 +1016,7 @@ impl SafeguardPayments {
             .instance()
             .get(&DataKey::IsPaused)
             .unwrap_or(false);
-        let spend_cap: i128 = env
+        let _global_spend_cap: i128 = env
             .storage()
             .instance()
             .get(&DataKey::SpendCap)
@@ -1021,7 +1070,8 @@ impl SafeguardPayments {
                 continue;
             }
 
-            if payment.amount > spend_cap {
+            let effective_cap = Self::get_effective_spend_cap(env.clone(), payment.token.clone());
+            if payment.amount > effective_cap {
                 verdicts.push_back(PaymentSimulationVerdict {
                     recipient: payment.recipient.clone(),
                     amount: payment.amount,
