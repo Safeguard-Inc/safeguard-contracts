@@ -973,3 +973,42 @@ fn test_simulate_payment_batch() {
     assert_eq!(verdicts.get(3).unwrap().status, PaymentStatus::Blocked);
     assert_eq!(verdicts.get(3).unwrap().reason_code, 105);
 }
+#[test]
+fn test_guardian_pause_circuit_breaker() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &100_0000000);
+
+    let guardian = Address::generate(&env);
+    let stranger = Address::generate(&env);
+
+    // Initial guardian is none
+    assert_eq!(client.get_guardian(), None);
+
+    // Admin sets guardian
+    client.set_guardian(&guardian);
+    assert_eq!(client.get_guardian(), Some(guardian.clone()));
+
+    // Stranger cannot trigger guardian pause
+    let unauthorized_res = client.try_pause_by_guardian(&stranger);
+    assert_eq!(unauthorized_res, Err(Ok(PaymentError::Unauthorized)));
+    assert!(!client.is_paused());
+
+    // Guardian successfully pauses
+    let pause_res = client.pause_by_guardian(&guardian);
+    assert_eq!(pause_res, ());
+    assert!(client.is_paused());
+
+    // Admin unpauses
+    client.set_paused(&false);
+    assert!(!client.is_paused());
+
+    // Admin can also trigger pause_by_guardian
+    client.pause_by_guardian(&admin);
+    assert!(client.is_paused());
+}
