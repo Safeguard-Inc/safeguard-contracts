@@ -1536,3 +1536,60 @@ fn test_batch_arbitrate_escrows() {
     let reserialized = client.try_batch_arbitrate_escrows(&ids, &false);
     assert_eq!(reserialized, Err(Ok(PaymentError::EscrowAlreadySettled)));
 }
+
+#[test]
+fn test_active_escrows_paged() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let sender = Address::generate(&env);
+    let rec1 = Address::generate(&env);
+    let rec2 = Address::generate(&env);
+    let rec3 = Address::generate(&env);
+
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &1000_0000000);
+
+    // Create 3 escrows
+    let r1 = client.pay(&sender, &rec1, &token_client.address, &100_0000000);
+    let r2 = client.pay(&sender, &rec2, &token_client.address, &200_0000000);
+    let r3 = client.pay(&sender, &rec3, &token_client.address, &300_0000000);
+
+    // Dispute r2
+    client.dispute_escrow(&sender, &r2.escrow_id);
+
+    // Release r3 (settled)
+    client.release_escrow(&r3.escrow_id);
+
+    // Total active = 2 (r1=Pending, r2=Disputed). r3=Released is omitted.
+    let all_active = client.get_active_escrows_paged(&0, &10);
+    assert_eq!(all_active.len(), 2);
+    assert_eq!(all_active.get(0).unwrap().id, r1.escrow_id);
+    assert_eq!(all_active.get(1).unwrap().id, r2.escrow_id);
+
+    // Page 1: offset 0, limit 1
+    let p1 = client.get_active_escrows_paged(&0, &1);
+    assert_eq!(p1.len(), 1);
+    assert_eq!(p1.get(0).unwrap().id, r1.escrow_id);
+
+    // Page 2: offset 1, limit 1
+    let p2 = client.get_active_escrows_paged(&1, &1);
+    assert_eq!(p2.len(), 1);
+    assert_eq!(p2.get(0).unwrap().id, r2.escrow_id);
+
+    // Out of bounds page: offset 5, limit 10
+    let empty_page = client.get_active_escrows_paged(&5, &10);
+    assert_eq!(empty_page.len(), 0);
+
+    // Zero limit
+    let zero_page = client.get_active_escrows_paged(&0, &0);
+    assert_eq!(zero_page.len(), 0);
+}
