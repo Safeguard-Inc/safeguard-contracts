@@ -1787,3 +1787,36 @@ fn test_batch_sanctions() {
     assert!(results.get(2).unwrap().is_some());
     assert_eq!(results.get(2).unwrap().unwrap().dataset_version, 2);
 }
+#[test]
+fn test_batch_active_version() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let p1 = rid(&env, "POL-1");
+    let p2 = rid(&env, "POL-2");
+    let p3 = rid(&env, "POL-3");
+    let p4 = rid(&env, "POL-UNKNOWN");
+
+    register_default_policy(&env, &client, &p1, 1);
+    register_default_policy(&env, &client, &p2, 1);
+    register_default_policy(&env, &client, &p3, 1);
+    register_default_policy(&env, &client, &p3, 2);
+
+    // Activate p1 at v1, p3 at v2 (p2 is left in draft without activation)
+    client.activate_version(&admin, &p1, &1);
+    client.activate_version(&admin, &p3, &2);
+
+    let query = vec![&env, p1.clone(), p2.clone(), p3.clone(), p4.clone()];
+    let results = client.batch_active_version(&query);
+
+    assert_eq!(results.len(), 4);
+    assert_eq!(results.get(0).unwrap(), Some(1));
+    assert_eq!(results.get(1).unwrap(), None);
+    assert_eq!(results.get(2).unwrap(), Some(2));
+    assert_eq!(results.get(3).unwrap(), None);
+}
