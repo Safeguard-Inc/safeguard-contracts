@@ -588,3 +588,50 @@ fn test_is_active_escrow() {
     client.release_escrow(&1);
     assert!(!client.is_active_escrow(&1));
 }
+
+#[test]
+fn test_get_escrows_by_sender() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let sender1 = Address::generate(&env);
+    let sender2 = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender1, &200_0000000);
+    token_admin_client.mint(&sender2, &200_0000000);
+
+    // Initial check: no escrows
+    assert_eq!(client.get_escrows_by_sender(&sender1).len(), 0);
+
+    // Sender 1 creates two escrows (amounts 60 and 70 > 50 cap)
+    client.pay(&sender1, &recipient, &token_client.address, &60_0000000);
+    client.pay(&sender1, &recipient, &token_client.address, &70_0000000);
+
+    // Sender 2 creates one escrow (amount 80 > 50 cap)
+    client.pay(&sender2, &recipient, &token_client.address, &80_0000000);
+
+    let sender1_escrows = client.get_escrows_by_sender(&sender1);
+    assert_eq!(sender1_escrows.len(), 2);
+    assert_eq!(sender1_escrows.get(0).unwrap().id, 1);
+    assert_eq!(sender1_escrows.get(0).unwrap().amount, 60_0000000);
+    assert_eq!(sender1_escrows.get(1).unwrap().id, 2);
+    assert_eq!(sender1_escrows.get(1).unwrap().amount, 70_0000000);
+
+    let sender2_escrows = client.get_escrows_by_sender(&sender2);
+    assert_eq!(sender2_escrows.len(), 1);
+    assert_eq!(sender2_escrows.get(0).unwrap().id, 3);
+    assert_eq!(sender2_escrows.get(0).unwrap().amount, 80_0000000);
+
+    let stranger = Address::generate(&env);
+    assert_eq!(client.get_escrows_by_sender(&stranger).len(), 0);
+}
