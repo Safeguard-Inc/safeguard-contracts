@@ -94,6 +94,66 @@ pub fn unbind_token(
     Ok(())
 }
 
+pub fn batch_bind_tokens(
+    env: &Env,
+    operator: &Address,
+    policy_id: &BytesN<32>,
+    tokens: &Vec<Address>,
+) -> Result<u32, ContractError> {
+    admin::require_admin_or_authority(env, operator)?;
+
+    if !storage::policy_exists(env, policy_id) {
+        return Err(ContractError::PolicyNotFound);
+    }
+
+    let mut existing = storage::token_bindings(env, policy_id);
+    let mut count = 0u32;
+    for token in tokens.iter() {
+        if !existing.contains(&token) {
+            existing.push_back(token.clone());
+            storage::set_token_policy(env, &token, policy_id);
+            crate::events::token_bound(env, policy_id, &token);
+            count += 1;
+        }
+    }
+    if count > 0 {
+        storage::set_token_bindings(env, policy_id, &existing);
+    }
+    Ok(count)
+}
+
+pub fn batch_unbind_tokens(
+    env: &Env,
+    operator: &Address,
+    policy_id: &BytesN<32>,
+    tokens: &Vec<Address>,
+) -> Result<u32, ContractError> {
+    admin::require_admin_or_authority(env, operator)?;
+
+    if !storage::policy_exists(env, policy_id) {
+        return Err(ContractError::PolicyNotFound);
+    }
+
+    let current = storage::token_bindings(env, policy_id);
+    let mut remaining: Vec<Address> = Vec::new(env);
+    let mut count = 0u32;
+    for entry in current.iter() {
+        if tokens.contains(&entry) {
+            if storage::token_policy(env, &entry).as_ref() == Some(policy_id) {
+                storage::clear_token_policy(env, &entry);
+            }
+            crate::events::token_unbound(env, policy_id, &entry);
+            count += 1;
+        } else {
+            remaining.push_back(entry);
+        }
+    }
+    if count > 0 {
+        storage::set_token_bindings(env, policy_id, &remaining);
+    }
+    Ok(count)
+}
+
 /// The tokens currently bound to a policy (public read).
 pub fn bound_tokens(env: &Env, policy_id: &BytesN<32>) -> Vec<Address> {
     storage::token_bindings(env, policy_id)

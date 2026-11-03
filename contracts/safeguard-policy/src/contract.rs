@@ -213,6 +213,26 @@ impl PolicyContract {
         registry::bound_tokens_count(&env, &policy_id)
     }
 
+    /// Bind multiple tokens to a policy in a single atomic invocation. Admin or registry authority.
+    pub fn batch_bind_tokens(
+        env: Env,
+        operator: Address,
+        policy_id: BytesN<32>,
+        tokens: Vec<Address>,
+    ) -> Result<u32, ContractError> {
+        registry::batch_bind_tokens(&env, &operator, &policy_id, &tokens)
+    }
+
+    /// Unbind multiple tokens from a policy in a single atomic invocation. Admin or registry authority.
+    pub fn batch_unbind_tokens(
+        env: Env,
+        operator: Address,
+        policy_id: BytesN<32>,
+        tokens: Vec<Address>,
+    ) -> Result<u32, ContractError> {
+        registry::batch_unbind_tokens(&env, &operator, &policy_id, &tokens)
+    }
+
     // ------------------------------------------------------------ registries
 
     /// Write (or replace) an account's identity verification record.
