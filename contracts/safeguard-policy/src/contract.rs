@@ -303,6 +303,15 @@ impl PolicyContract {
         jurisdiction::jurisdiction(&env, &account)
     }
 
+    /// Read jurisdiction codes for multiple accounts in a single batch query.
+    pub fn batch_jurisdiction(env: Env, accounts: Vec<Address>) -> Vec<Option<u32>> {
+        let mut results = Vec::new(&env);
+        for account in accounts.iter() {
+            results.push_back(jurisdiction::jurisdiction(&env, &account));
+        }
+        results
+    }
+
     // ------------------------------------------------------------ evaluation
 
     /// Evaluate a subject against the active version of a policy for a token.
