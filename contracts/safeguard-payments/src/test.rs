@@ -1066,3 +1066,51 @@ fn test_per_token_spend_cap_routing() {
     assert_eq!(client.get_token_spend_cap(&token_b), None);
     assert_eq!(client.get_effective_spend_cap(&token_b), 50_0000000);
 }
+#[test]
+fn test_get_allowlist_batch() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &100_0000000);
+
+    let a1 = Address::generate(&env);
+    let a2 = Address::generate(&env);
+    let a3 = Address::generate(&env);
+    let a4 = Address::generate(&env);
+
+    client.add_to_allowlist(&a1);
+    client.add_to_allowlist(&a3);
+
+    assert!(client.is_allowlisted(&a1));
+    assert!(!client.is_allowlisted(&a2));
+    assert!(client.is_allowlisted(&a3));
+    assert!(!client.is_allowlisted(&a4));
+
+    let mut query = soroban_sdk::Vec::new(&env);
+    query.push_back(a1.clone());
+    query.push_back(a2.clone());
+    query.push_back(a3.clone());
+    query.push_back(a4.clone());
+
+    let results = client.get_allowlist_batch(&query);
+    assert_eq!(results.len(), 4);
+    assert_eq!(results.get(0).unwrap(), true);
+    assert_eq!(results.get(1).unwrap(), false);
+    assert_eq!(results.get(2).unwrap(), true);
+    assert_eq!(results.get(3).unwrap(), false);
+
+    // Remove a1
+    client.remove_from_allowlist(&a1);
+    assert!(!client.is_allowlisted(&a1));
+
+    let mut query2 = soroban_sdk::Vec::new(&env);
+    query2.push_back(a1.clone());
+    query2.push_back(a3.clone());
+    let results2 = client.get_allowlist_batch(&query2);
+    assert_eq!(results2.get(0).unwrap(), false);
+    assert_eq!(results2.get(1).unwrap(), true);
+}
