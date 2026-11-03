@@ -271,6 +271,16 @@ impl PolicyContract {
         registry::bound_tokens_count(&env, &policy_id)
     }
 
+    /// Retrieve tokens bound to a policy with offset and limit pagination.
+    pub fn bound_tokens_paged(
+        env: Env,
+        policy_id: BytesN<32>,
+        offset: u32,
+        limit: u32,
+    ) -> Vec<Address> {
+        registry::bound_tokens_paged(&env, &policy_id, offset, limit)
+    }
+
     /// Bind multiple tokens to a policy in a single atomic invocation. Admin or registry authority.
     pub fn batch_bind_tokens(
         env: Env,
