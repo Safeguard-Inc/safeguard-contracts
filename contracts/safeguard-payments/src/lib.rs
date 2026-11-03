@@ -74,6 +74,23 @@ pub struct EscrowRecord {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PaymentCheckParam {
+    pub recipient: Address,
+    pub token: Address,
+    pub amount: i128,
+}
+
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PaymentSimulationVerdict {
+    pub recipient: Address,
+    pub amount: i128,
+    pub status: PaymentStatus,
+    pub reason_code: u32,
+}
+
+#[contracttype]
 #[derive(Clone)]
 enum DataKey {
     Admin,
@@ -894,6 +911,92 @@ impl SafeguardPayments {
     /// Auto-extend instance storage TTL to prevent state archival.
     pub fn extend_ttl(env: Env, threshold: u32, extend_to: u32) {
         env.storage().instance().extend_ttl(threshold, extend_to);
+    }
+
+    /// Dry-run simulation of a payment batch against current gateway policy, spend cap,
+    /// and recipient denylist status. Does NOT require authentication and does NOT transfer tokens.
+    pub fn simulate_payment_batch(
+        env: Env,
+        sender: Address,
+        payments: Vec<PaymentCheckParam>,
+    ) -> Vec<PaymentSimulationVerdict> {
+        let is_paused: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::IsPaused)
+            .unwrap_or(false);
+        let spend_cap: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::SpendCap)
+            .unwrap_or(0);
+        let min_amount: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::MinPaymentAmount)
+            .unwrap_or(1);
+        let is_sender_denylisted = Self::is_denylisted(env.clone(), sender.clone());
+
+        let mut verdicts = Vec::new(&env);
+        for payment in payments.iter() {
+            if is_paused {
+                verdicts.push_back(PaymentSimulationVerdict {
+                    recipient: payment.recipient.clone(),
+                    amount: payment.amount,
+                    status: PaymentStatus::Blocked,
+                    reason_code: 104,
+                });
+                continue;
+            }
+
+            if payment.amount < min_amount {
+                verdicts.push_back(PaymentSimulationVerdict {
+                    recipient: payment.recipient.clone(),
+                    amount: payment.amount,
+                    status: PaymentStatus::Blocked,
+                    reason_code: 105,
+                });
+                continue;
+            }
+
+            if is_sender_denylisted {
+                verdicts.push_back(PaymentSimulationVerdict {
+                    recipient: payment.recipient.clone(),
+                    amount: payment.amount,
+                    status: PaymentStatus::Blocked,
+                    reason_code: 112,
+                });
+                continue;
+            }
+
+            if Self::is_denylisted(env.clone(), payment.recipient.clone()) {
+                verdicts.push_back(PaymentSimulationVerdict {
+                    recipient: payment.recipient.clone(),
+                    amount: payment.amount,
+                    status: PaymentStatus::Blocked,
+                    reason_code: 111,
+                });
+                continue;
+            }
+
+            if payment.amount > spend_cap {
+                verdicts.push_back(PaymentSimulationVerdict {
+                    recipient: payment.recipient.clone(),
+                    amount: payment.amount,
+                    status: PaymentStatus::Escrowed,
+                    reason_code: 201,
+                });
+            } else {
+                verdicts.push_back(PaymentSimulationVerdict {
+                    recipient: payment.recipient.clone(),
+                    amount: payment.amount,
+                    status: PaymentStatus::Approved,
+                    reason_code: 200,
+                });
+            }
+        }
+
+        verdicts
     }
 
     fn require_admin(env: &Env) -> Result<(), PaymentError> {
