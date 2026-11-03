@@ -1012,3 +1012,57 @@ fn test_guardian_pause_circuit_breaker() {
     client.pause_by_guardian(&admin);
     assert!(client.is_paused());
 }
+#[test]
+fn test_per_token_spend_cap_routing() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let token_a = Address::generate(&env); // uses global 50
+    let token_b = Address::generate(&env); // custom high cap 200
+    let token_c = Address::generate(&env); // custom low cap 5
+
+    // Default fallback to global spend cap
+    assert_eq!(client.get_effective_spend_cap(&token_a), 50_0000000);
+    assert_eq!(client.get_token_spend_cap(&token_a), None);
+
+    // Admin sets per-token spend caps
+    client.set_token_spend_cap(&token_b, &200_0000000);
+    client.set_token_spend_cap(&token_c, &5_0000000);
+
+    assert_eq!(client.get_token_spend_cap(&token_b), Some(200_0000000));
+    assert_eq!(client.get_effective_spend_cap(&token_b), 200_0000000);
+    assert_eq!(client.get_effective_spend_cap(&token_c), 5_0000000);
+
+    // Test simulation routing with token caps
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    let mut batch = soroban_sdk::Vec::new(&env);
+    // Token B with 100 is below 200 -> Approved
+    batch.push_back(PaymentCheckParam {
+        recipient: recipient.clone(),
+        token: token_b.clone(),
+        amount: 100_0000000,
+    });
+    // Token C with 10 is above 5 -> Escrowed
+    batch.push_back(PaymentCheckParam {
+        recipient: recipient.clone(),
+        token: token_c.clone(),
+        amount: 10_0000000,
+    });
+
+    let verdicts = client.simulate_payment_batch(&sender, &batch);
+    assert_eq!(verdicts.get(0).unwrap().status, PaymentStatus::Approved);
+    assert_eq!(verdicts.get(1).unwrap().status, PaymentStatus::Escrowed);
+
+    // Remove token cap restores fallback
+    client.remove_token_spend_cap(&token_b);
+    assert_eq!(client.get_token_spend_cap(&token_b), None);
+    assert_eq!(client.get_effective_spend_cap(&token_b), 50_0000000);
+}
