@@ -1405,3 +1405,41 @@ fn test_batch_refund_escrows() {
     let reserialized = client.try_batch_refund_escrows(&admin, &ids);
     assert_eq!(reserialized, Err(Ok(PaymentError::EscrowAlreadySettled)));
 }
+
+#[test]
+fn test_get_payment_configuration() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    // Initial configuration check
+    let cfg = client.get_configuration();
+    assert_eq!(cfg.admin, admin);
+    assert_eq!(cfg.pending_admin, None);
+    assert_eq!(cfg.escrow_period, 3600);
+    assert_eq!(cfg.spend_cap, 50_0000000);
+    assert_eq!(cfg.min_payment_amount, 1);
+    assert_eq!(cfg.is_paused, false);
+    assert_eq!(cfg.guardian, None);
+    assert_eq!(cfg.require_allowlist, false);
+    assert_eq!(cfg.total_volume, 0);
+    assert_eq!(cfg.payment_sequence, 0);
+
+    // Set guardian and min payment amount
+    let guardian = Address::generate(&env);
+    client.set_guardian(&guardian);
+    client.set_min_payment_amount(&10_0000000);
+
+    let updated_cfg = client.get_configuration();
+    assert_eq!(updated_cfg.guardian, Some(guardian));
+    assert_eq!(updated_cfg.min_payment_amount, 10_0000000);
+
+    // Trigger pause circuit breaker via set_paused
+    client.set_paused(&true);
+    assert_eq!(client.get_configuration().is_paused, true);
+}
