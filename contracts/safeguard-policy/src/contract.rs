@@ -146,6 +146,32 @@ impl PolicyContract {
         results
     }
 
+    /// Check whether multiple accounts hold a specific administrative role:
+    /// 1 = Admin, 2 = Registry Authority, 3 = Policy Authority, 4+ = Any Role.
+    pub fn batch_has_role_authority(
+        env: Env,
+        role_type: u32,
+        accounts: Vec<Address>,
+    ) -> Vec<bool> {
+        let admin_opt = Self::admin(env.clone()).ok();
+        let mut results = Vec::new(&env);
+        for acc in accounts.iter() {
+            let is_admin = admin_opt.as_ref().map_or(false, |a| *a == acc);
+            let has = match role_type {
+                1 => is_admin,
+                2 => Self::is_registry_authority(env.clone(), acc),
+                3 => Self::is_policy_authority(env.clone(), acc),
+                _ => {
+                    is_admin
+                        || Self::is_registry_authority(env.clone(), acc.clone())
+                        || Self::is_policy_authority(env.clone(), acc)
+                }
+            };
+            results.push_back(has);
+        }
+        results
+    }
+
     /// Aggregated metadata telemetry query for this policy contract instance.
     pub fn get_metadata(env: Env) -> Result<PolicyContractMetadata, ContractError> {
         let admin = Self::admin(env.clone())?;
