@@ -2092,3 +2092,37 @@ fn test_get_policy_version_details() {
     let not_found = client.try_get_policy_version_details(&policy_id, &99);
     assert_eq!(not_found, Err(Ok(ContractError::VersionNotFound)));
 }
+
+#[test]
+fn test_batch_is_policy_active() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(PolicyContract, ());
+    let client = PolicyContractClient::new(&env, &contract_id);
+    let admin = Address::generate(&env);
+    client.initialize(&admin);
+
+    let p1 = rid(&env, "active-policy-1");
+    let p2 = rid(&env, "draft-policy-2");
+    let p3 = rid(&env, "unregistered-policy-3");
+
+    register_default_policy(&env, &client, &p1, 1);
+    client.activate_version(&admin, &p1, &1);
+
+    register_default_policy(&env, &client, &p2, 1);
+    // p2 is draft, not activated
+
+    let ids = vec![&env, p1.clone(), p2.clone(), p3.clone()];
+    let res1 = client.batch_is_policy_active(&ids);
+    assert_eq!(res1.get(0).unwrap(), true);
+    assert_eq!(res1.get(1).unwrap(), false);
+    assert_eq!(res1.get(2).unwrap(), false);
+
+    // Activate p2
+    client.activate_version(&admin, &p2, &1);
+    let res2 = client.batch_is_policy_active(&ids);
+    assert_eq!(res2.get(0).unwrap(), true);
+    assert_eq!(res2.get(1).unwrap(), true);
+    assert_eq!(res2.get(2).unwrap(), false);
+}
