@@ -1280,7 +1280,7 @@ fn test_batch_release_escrows() {
     token_admin_client.mint(&sender, &500_0000000);
 
     // Create 2 escrows
-    let _r1 = client.pay(&sender, &rec1, &token_client.address, &100_0000000);
+    let r1 = client.pay(&sender, &rec1, &token_client.address, &100_0000000);
     let r2 = client.pay(&sender, &rec2, &token_client.address, &150_0000000);
 
     assert_eq!(token_client.balance(&rec1), 0);
@@ -1351,4 +1351,57 @@ fn test_get_escrow_metrics() {
     assert_eq!(metrics.disputed_count, 1);
     assert_eq!(metrics.settled_count, 1);
     assert_eq!(metrics.total_locked_amount, 300_0000000); // 100 + 200
+}
+
+#[test]
+fn test_batch_refund_escrows() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let sender = Address::generate(&env);
+    let rec1 = Address::generate(&env);
+    let rec2 = Address::generate(&env);
+    let stranger = Address::generate(&env);
+
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &500_0000000);
+
+    // Create 2 escrows
+    let r1 = client.pay(&sender, &rec1, &token_client.address, &100_0000000);
+    let r2 = client.pay(&sender, &rec2, &token_client.address, &150_0000000);
+
+    assert_eq!(token_client.balance(&sender), 250_0000000);
+
+    let mut ids = Vec::new(&env);
+    ids.push_back(r1.escrow_id);
+    ids.push_back(r2.escrow_id);
+
+    // Stranger tries to refund -> Unauthorized
+    let stranger_res = client.try_batch_refund_escrows(&stranger, &ids);
+    assert_eq!(stranger_res, Err(Ok(PaymentError::Unauthorized)));
+
+    // Sender tries to refund before timelock -> EscrowTimelockActive
+    let premature_res = client.try_batch_refund_escrows(&sender, &ids);
+    assert_eq!(premature_res, Err(Ok(PaymentError::EscrowTimelockActive)));
+
+    // Admin refunds in bulk immediately
+    let refunded_count = client.batch_refund_escrows(&admin, &ids);
+    assert_eq!(refunded_count, 2);
+
+    // Balances returned to sender
+    assert_eq!(token_client.balance(&sender), 500_0000000);
+    assert_eq!(client.get_escrow(&r1.escrow_id).status, EscrowStatus::Refunded);
+    assert_eq!(client.get_escrow(&r2.escrow_id).status, EscrowStatus::Refunded);
+
+    // Subsequent batch refund fails as already settled
+    let reserialized = client.try_batch_refund_escrows(&admin, &ids);
+    assert_eq!(reserialized, Err(Ok(PaymentError::EscrowAlreadySettled)));
 }
