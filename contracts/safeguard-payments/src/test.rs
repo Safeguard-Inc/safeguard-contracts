@@ -1702,3 +1702,40 @@ fn test_get_payment_sequence_details() {
     assert_eq!(d1.is_paused, false);
     assert_eq!(d1.active_spend_cap, 100_0000000);
 }
+
+#[test]
+fn test_batch_compliance_queries() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &100_0000000);
+
+    let a1 = Address::generate(&env);
+    let a2 = Address::generate(&env);
+    let a3 = Address::generate(&env);
+
+    // Add a1 and a2 to denylist
+    let mut deny_batch = Vec::new(&env);
+    deny_batch.push_back(a1.clone());
+    deny_batch.push_back(a2.clone());
+    client.add_to_denylist_batch(&deny_batch);
+
+    // Add a3 to allowlist
+    client.add_to_allowlist(&a3);
+
+    let check_batch = Vec::from_array(&env, [a1.clone(), a2.clone(), a3.clone()]);
+
+    let deny_res = client.batch_is_denylisted(&check_batch);
+    assert_eq!(deny_res.get(0).unwrap(), true);
+    assert_eq!(deny_res.get(1).unwrap(), true);
+    assert_eq!(deny_res.get(2).unwrap(), false);
+
+    let allow_res = client.batch_is_allowlisted(&check_batch);
+    assert_eq!(allow_res.get(0).unwrap(), false);
+    assert_eq!(allow_res.get(1).unwrap(), false);
+    assert_eq!(allow_res.get(2).unwrap(), true);
+}
