@@ -125,6 +125,16 @@ pub struct PauseStatus {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PaymentSequenceDetails {
+    pub current_sequence: u64,
+    pub total_volume: i128,
+    pub min_payment_amount: i128,
+    pub is_paused: bool,
+    pub active_spend_cap: i128,
+}
+
+#[contracttype]
 #[derive(Clone)]
 enum DataKey {
     Admin,
@@ -1551,6 +1561,27 @@ impl SafeguardPayments {
             .instance()
             .get(&DataKey::PaymentSequence)
             .unwrap_or(0)
+    }
+
+    /// Aggregated sequence, volume, and operational metrics for payment reconciliation indexers.
+    pub fn get_payment_sequence_details(env: Env) -> PaymentSequenceDetails {
+        let current_sequence = Self::get_payment_sequence(env.clone());
+        let total_volume = Self::get_total_volume(env.clone());
+        let min_payment_amount: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::MinPaymentAmount)
+            .unwrap_or(0);
+        let is_paused = Self::is_paused(env.clone());
+        let active_spend_cap = Self::get_spend_cap(env.clone());
+
+        PaymentSequenceDetails {
+            current_sequence,
+            total_volume,
+            min_payment_amount,
+            is_paused,
+            active_spend_cap,
+        }
     }
 
     /// Retrieve total cumulative payment volume processed by the contract in stroops/token units.
