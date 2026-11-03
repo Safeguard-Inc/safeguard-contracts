@@ -25,6 +25,8 @@ pub enum PaymentError {
     SenderDenylisted = 12,
     PendingAdminNotFound = 13,
     InvalidEscrowPeriod = 14,
+    EscrowUnderDispute = 15,
+    InvalidDisputeParty = 16,
 }
 
 #[contracttype]
@@ -41,6 +43,8 @@ pub enum EscrowStatus {
     Pending = 1,
     Released = 2,
     Refunded = 3,
+    Disputed = 4,
+    Arbitrated = 5,
 }
 
 #[contracttype]
@@ -492,6 +496,37 @@ impl SafeguardPayments {
                 timestamp,
             })
         }
+    }
+
+    /// Raise a dispute on an active escrow. Can only be invoked by the sender or the recipient.
+    pub fn dispute_escrow(env: Env, caller: Address, escrow_id: u64) -> Result<(), PaymentError> {
+        caller.require_auth();
+
+        let mut record: EscrowRecord = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Escrow(escrow_id))
+            .ok_or(PaymentError::EscrowNotFound)?;
+
+        if record.status != EscrowStatus::Pending {
+            return Err(PaymentError::EscrowAlreadySettled);
+        }
+
+        if caller != record.sender && caller != record.recipient {
+            return Err(PaymentError::InvalidDisputeParty);
+        }
+
+        record.status = EscrowStatus::Disputed;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &record);
+
+        env.events().publish(
+            (soroban_sdk::symbol_short!("esc_disp"), escrow_id),
+            (caller, record.amount),
+        );
+
+        Ok(())
     }
 
     /// Admin releases an escrowed payment to the recipient.
