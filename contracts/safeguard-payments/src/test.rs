@@ -681,3 +681,46 @@ fn test_get_escrows_by_recipient() {
     let stranger = Address::generate(&env);
     assert_eq!(client.get_escrows_by_recipient(&stranger).len(), 0);
 }
+
+#[test]
+fn test_dispute_escrow() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+    let stranger = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &200_0000000);
+
+    // Escrow id 1 created
+    let receipt = client.pay(&sender, &recipient, &token_client.address, &75_0000000);
+    assert_eq!(receipt.status, PaymentStatus::Escrowed);
+    assert_eq!(receipt.escrow_id, 1);
+
+    // Stranger cannot dispute
+    let res = client.try_dispute_escrow(&stranger, &1);
+    assert_eq!(res, Err(Ok(PaymentError::InvalidDisputeParty)));
+
+    // Recipient disputes
+    client.dispute_escrow(&recipient, &1);
+
+    let mut query_ids = Vec::new(&env);
+    query_ids.push_back(1);
+    let batch = client.get_escrows_batch(&query_ids);
+    let record = batch.get(0).unwrap();
+    assert_eq!(record.status, EscrowStatus::Disputed);
+
+    // Cannot dispute again
+    let res2 = client.try_dispute_escrow(&sender, &1);
+    assert_eq!(res2, Err(Ok(PaymentError::EscrowAlreadySettled)));
+}
