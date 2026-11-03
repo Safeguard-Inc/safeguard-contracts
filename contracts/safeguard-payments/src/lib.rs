@@ -117,6 +117,14 @@ pub struct PaymentGatewayConfig {
 }
 
 #[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PauseStatus {
+    pub is_paused: bool,
+    pub paused_until: u64,
+    pub paused_by: Option<Address>,
+}
+
+#[contracttype]
 #[derive(Clone)]
 enum DataKey {
     Admin,
@@ -127,6 +135,8 @@ enum DataKey {
     Escrow(u64),
     SpendCap,
     IsPaused,
+    PauseUntil,
+    PausedBy,
     Guardian,
     Denylist(Address),
     Allowlist(Address),
@@ -280,8 +290,69 @@ impl SafeguardPayments {
     pub fn set_paused(env: Env, paused: bool) -> Result<(), PaymentError> {
         Self::require_admin(&env)?;
         env.storage().instance().set(&DataKey::IsPaused, &paused);
+        if !paused {
+            env.storage().instance().remove(&DataKey::PauseUntil);
+            env.storage().instance().remove(&DataKey::PausedBy);
+        }
         env.events().publish((symbol_short!("paused"),), paused);
         Ok(())
+    }
+
+    /// Engage emergency circuit breaker pause with an automatic expiration timelock duration in seconds.
+    /// Can be called by Admin or configured Guardian.
+    pub fn emergency_pause_with_duration(
+        env: Env,
+        caller: Address,
+        duration_seconds: u64,
+    ) -> Result<(), PaymentError> {
+        caller.require_auth();
+
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(PaymentError::NotInitialized)?;
+        let is_admin = caller == admin;
+
+        let is_guardian = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&DataKey::Guardian)
+            .map(|g| g == caller)
+            .unwrap_or(false);
+
+        if !is_admin && !is_guardian {
+            return Err(PaymentError::Unauthorized);
+        }
+
+        let until = env.ledger().timestamp().saturating_add(duration_seconds);
+        env.storage().instance().set(&DataKey::IsPaused, &true);
+        env.storage().instance().set(&DataKey::PauseUntil, &until);
+        env.storage().instance().set(&DataKey::PausedBy, &caller);
+
+        env.events().publish(
+            (symbol_short!("em_pause"),),
+            (caller, until),
+        );
+
+        Ok(())
+    }
+
+    /// Retrieve full pause status including whether pause is active, expiry timestamp, and initiator.
+    pub fn get_pause_status(env: Env) -> PauseStatus {
+        let active = Self::is_paused(env.clone());
+        let paused_until: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PauseUntil)
+            .unwrap_or(0);
+        let paused_by: Option<Address> = env.storage().instance().get(&DataKey::PausedBy);
+
+        PauseStatus {
+            is_paused: active,
+            paused_until,
+            paused_by,
+        }
     }
 
     /// Update minimum payment amount threshold (prevents dusting and sub-minimum spam).
@@ -462,12 +533,7 @@ impl SafeguardPayments {
             return Err(PaymentError::NotInitialized);
         }
 
-        let is_paused: bool = env
-            .storage()
-            .instance()
-            .get(&DataKey::IsPaused)
-            .unwrap_or(false);
-        if is_paused {
+        if Self::is_paused(env.clone()) {
             return Err(PaymentError::ContractPaused);
         }
 
@@ -1204,7 +1270,7 @@ impl SafeguardPayments {
         let escrow_period: u64 = env.storage().instance().get(&DataKey::EscrowPeriod).unwrap_or(0);
         let spend_cap: i128 = env.storage().instance().get(&DataKey::SpendCap).unwrap_or(0);
         let min_payment_amount: i128 = env.storage().instance().get(&DataKey::MinPaymentAmount).unwrap_or(0);
-        let is_paused: bool = env.storage().instance().get(&DataKey::IsPaused).unwrap_or(false);
+        let is_paused: bool = Self::is_paused(env.clone());
         let require_allowlist: bool = env.storage().instance().get(&DataKey::RequireAllowlist).unwrap_or(false);
         let total_volume: i128 = env.storage().instance().get(&DataKey::TotalVolume).unwrap_or(0);
         let payment_sequence: u64 = env.storage().instance().get(&DataKey::PaymentSequence).unwrap_or(0);
@@ -1382,11 +1448,7 @@ impl SafeguardPayments {
             .instance()
             .get(&DataKey::EscrowPeriod)
             .unwrap_or(0);
-        let is_paused: bool = env
-            .storage()
-            .instance()
-            .get(&DataKey::IsPaused)
-            .unwrap_or(false);
+        let is_paused: bool = Self::is_paused(env.clone());
         let total_escrows: u64 = env
             .storage()
             .instance()
@@ -1513,11 +1575,26 @@ impl SafeguardPayments {
     }
 
     /// Check if contract operations are paused.
+    /// If paused with an emergency timelock duration, returns false once ledger timestamp >= paused_until.
     pub fn is_paused(env: Env) -> bool {
-        env.storage()
+        let paused: bool = env
+            .storage()
             .instance()
             .get(&DataKey::IsPaused)
-            .unwrap_or(false)
+            .unwrap_or(false);
+        if !paused {
+            return false;
+        }
+        if let Some(until) = env
+            .storage()
+            .instance()
+            .get::<_, u64>(&DataKey::PauseUntil)
+        {
+            if until > 0 && env.ledger().timestamp() >= until {
+                return false;
+            }
+        }
+        true
     }
 
     /// Auto-extend instance storage TTL to prevent state archival.
@@ -1532,11 +1609,7 @@ impl SafeguardPayments {
         sender: Address,
         payments: Vec<PaymentCheckParam>,
     ) -> Vec<PaymentSimulationVerdict> {
-        let is_paused: bool = env
-            .storage()
-            .instance()
-            .get(&DataKey::IsPaused)
-            .unwrap_or(false);
+        let is_paused: bool = Self::is_paused(env.clone());
         let _global_spend_cap: i128 = env
             .storage()
             .instance()
