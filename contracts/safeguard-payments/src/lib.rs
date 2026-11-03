@@ -970,6 +970,62 @@ impl SafeguardPayments {
         Ok(())
     }
 
+    /// Refund multiple escrowed payments back to their senders in bulk.
+    /// Can be initiated by admin immediately, or by a sender for escrows where caller == record.sender and release_after timelock has passed.
+    pub fn batch_refund_escrows(
+        env: Env,
+        caller: Address,
+        escrow_ids: Vec<u64>,
+    ) -> Result<u32, PaymentError> {
+        caller.require_auth();
+
+        let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
+        let is_admin = caller == admin;
+
+        let mut count = 0u32;
+        for id in escrow_ids.iter() {
+            let mut record: EscrowRecord = env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .ok_or(PaymentError::EscrowNotFound)?;
+
+            if record.status != EscrowStatus::Pending {
+                return Err(PaymentError::EscrowAlreadySettled);
+            }
+
+            if !is_admin {
+                if caller != record.sender {
+                    return Err(PaymentError::Unauthorized);
+                }
+                if env.ledger().timestamp() < record.release_after {
+                    return Err(PaymentError::EscrowTimelockActive);
+                }
+            }
+
+            record.status = EscrowStatus::Refunded;
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(id), &record);
+
+            let token_client = token::Client::new(&env, &record.token);
+            token_client.transfer(
+                &env.current_contract_address(),
+                &record.sender,
+                &record.amount,
+            );
+
+            env.events().publish(
+                (symbol_short!("esc_ref"),),
+                (id, record.sender.clone(), record.amount),
+            );
+
+            count += 1;
+        }
+
+        Ok(count)
+    }
+
     /// Aggregated on-chain telemetry for all escrow records.
     pub fn get_escrow_metrics(env: Env) -> EscrowMetrics {
         let total_escrows: u64 = env
