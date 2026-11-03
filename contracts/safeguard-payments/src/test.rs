@@ -635,3 +635,49 @@ fn test_get_escrows_by_sender() {
     let stranger = Address::generate(&env);
     assert_eq!(client.get_escrows_by_sender(&stranger).len(), 0);
 }
+
+#[test]
+fn test_get_escrows_by_recipient() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let sender = Address::generate(&env);
+    let recipient_a = Address::generate(&env);
+    let recipient_b = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &300_0000000);
+
+    // Initial check: no escrows
+    assert_eq!(client.get_escrows_by_recipient(&recipient_a).len(), 0);
+
+    // Sender sends 2 payments to recipient A (65 and 75 > 50 cap)
+    client.pay(&sender, &recipient_a, &token_client.address, &65_0000000);
+    client.pay(&sender, &recipient_a, &token_client.address, &75_0000000);
+
+    // Sender sends 1 payment to recipient B (90 > 50 cap)
+    client.pay(&sender, &recipient_b, &token_client.address, &90_0000000);
+
+    let rec_a_escrows = client.get_escrows_by_recipient(&recipient_a);
+    assert_eq!(rec_a_escrows.len(), 2);
+    assert_eq!(rec_a_escrows.get(0).unwrap().id, 1);
+    assert_eq!(rec_a_escrows.get(0).unwrap().amount, 65_0000000);
+    assert_eq!(rec_a_escrows.get(1).unwrap().id, 2);
+    assert_eq!(rec_a_escrows.get(1).unwrap().amount, 75_0000000);
+
+    let rec_b_escrows = client.get_escrows_by_recipient(&recipient_b);
+    assert_eq!(rec_b_escrows.len(), 1);
+    assert_eq!(rec_b_escrows.get(0).unwrap().id, 3);
+    assert_eq!(rec_b_escrows.get(0).unwrap().amount, 90_0000000);
+
+    let stranger = Address::generate(&env);
+    assert_eq!(client.get_escrows_by_recipient(&stranger).len(), 0);
+}
