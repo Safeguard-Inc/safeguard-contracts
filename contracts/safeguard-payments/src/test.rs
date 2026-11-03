@@ -1739,3 +1739,59 @@ fn test_batch_compliance_queries() {
     assert_eq!(allow_res.get(1).unwrap(), false);
     assert_eq!(allow_res.get(2).unwrap(), true);
 }
+
+#[test]
+fn test_get_escrow_ids_by_status_paged() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let sender = Address::generate(&env);
+    let r1_rec = Address::generate(&env);
+    let r2_rec = Address::generate(&env);
+    let r3_rec = Address::generate(&env);
+
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &1000_0000000);
+
+    let e1 = client.pay(&sender, &r1_rec, &token_client.address, &100_0000000);
+    let e2 = client.pay(&sender, &r2_rec, &token_client.address, &120_0000000);
+    let e3 = client.pay(&sender, &r3_rec, &token_client.address, &140_0000000);
+
+    // e2 -> dispute
+    client.dispute_escrow(&sender, &e2.escrow_id);
+    // e3 -> release
+    client.release_escrow(&e3.escrow_id);
+
+    // Status 1: Pending (only e1)
+    let pending_ids = client.get_escrow_ids_by_status_paged(&1, &0, &10);
+    assert_eq!(pending_ids.len(), 1);
+    assert_eq!(pending_ids.get(0).unwrap(), e1.escrow_id);
+
+    // Status 4: Disputed (only e2)
+    let disputed_ids = client.get_escrow_ids_by_status_paged(&4, &0, &10);
+    assert_eq!(disputed_ids.len(), 1);
+    assert_eq!(disputed_ids.get(0).unwrap(), e2.escrow_id);
+
+    // Status 2: Released (only e3)
+    let released_ids = client.get_escrow_ids_by_status_paged(&2, &0, &10);
+    assert_eq!(released_ids.len(), 1);
+    assert_eq!(released_ids.get(0).unwrap(), e3.escrow_id);
+
+    // Status 0: All (paged)
+    let all_p1 = client.get_escrow_ids_by_status_paged(&0, &0, &2);
+    assert_eq!(all_p1.len(), 2);
+    assert_eq!(all_p1.get(0).unwrap(), e1.escrow_id);
+    assert_eq!(all_p1.get(1).unwrap(), e2.escrow_id);
+
+    let all_p2 = client.get_escrow_ids_by_status_paged(&0, &2, &2);
+    assert_eq!(all_p2.len(), 1);
+    assert_eq!(all_p2.get(0).unwrap(), e3.escrow_id);
+}
