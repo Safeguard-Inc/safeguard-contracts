@@ -1547,6 +1547,16 @@ impl SafeguardPayments {
         results
     }
 
+    /// Check whether multiple addresses are on the gateway denylist in a single batch query.
+    pub fn batch_is_denylisted(env: Env, addresses: Vec<Address>) -> Vec<bool> {
+        Self::get_denylist_batch(env, addresses)
+    }
+
+    /// Check whether multiple addresses are on the gateway allowlist in a single batch query.
+    pub fn batch_is_allowlisted(env: Env, addresses: Vec<Address>) -> Vec<bool> {
+        Self::get_allowlist_batch(env, addresses)
+    }
+
     /// Retrieve current spend cap.
     pub fn get_spend_cap(env: Env) -> i128 {
         env.storage()
