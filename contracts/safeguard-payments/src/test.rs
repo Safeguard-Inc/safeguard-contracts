@@ -1166,3 +1166,54 @@ fn test_release_escrow_partial() {
     let settled_res = client.try_release_escrow_partial(&1, &10_0000000);
     assert_eq!(settled_res, Err(Ok(PaymentError::EscrowAlreadySettled)));
 }
+
+#[test]
+fn test_extend_dispute_period() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &200_0000000);
+
+    // Escrow payment of 100
+    let receipt = client.pay(&sender, &recipient, &token_client.address, &100_0000000);
+    assert_eq!(receipt.status, PaymentStatus::Escrowed);
+    let initial_escrow = client.get_escrow(&receipt.escrow_id);
+    let initial_release_after = initial_escrow.release_after;
+
+    // 1. Extend while Pending
+    let new_release = client.extend_dispute_period(&receipt.escrow_id, &1800);
+    assert_eq!(new_release, initial_release_after + 1800);
+    assert_eq!(client.get_escrow(&receipt.escrow_id).release_after, initial_release_after + 1800);
+
+    // 2. Put into Disputed status
+    client.dispute_escrow(&sender, &receipt.escrow_id);
+    assert_eq!(client.get_escrow(&receipt.escrow_id).status, EscrowStatus::Disputed);
+
+    // 3. Extend while Disputed
+    let disputed_release = client.extend_dispute_period(&receipt.escrow_id, &3600);
+    assert_eq!(disputed_release, initial_release_after + 1800 + 3600);
+
+    // 4. Reject extension with 0 duration
+    let zero_res = client.try_extend_dispute_period(&receipt.escrow_id, &0);
+    assert_eq!(zero_res, Err(Ok(PaymentError::InvalidEscrowPeriod)));
+
+    // 5. Arbitrate and resolve
+    client.arbitrate_escrow(&receipt.escrow_id, &true);
+    assert_eq!(client.get_escrow(&receipt.escrow_id).status, EscrowStatus::Released);
+
+    // 6. Cannot extend settled escrow
+    let settled_res = client.try_extend_dispute_period(&receipt.escrow_id, &1000);
+    assert_eq!(settled_res, Err(Ok(PaymentError::EscrowAlreadySettled)));
+}
