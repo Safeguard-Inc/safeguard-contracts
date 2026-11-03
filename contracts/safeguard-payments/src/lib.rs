@@ -737,6 +737,47 @@ impl SafeguardPayments {
         Ok(())
     }
 
+    /// Admin releases multiple active escrows to their respective recipients in bulk.
+    pub fn batch_release_escrows(
+        env: Env,
+        escrow_ids: Vec<u64>,
+    ) -> Result<u32, PaymentError> {
+        Self::require_admin(&env)?;
+
+        let mut count = 0u32;
+        for id in escrow_ids.iter() {
+            let mut record: EscrowRecord = env
+                .storage()
+                .persistent()
+                .get(&DataKey::Escrow(id))
+                .ok_or(PaymentError::EscrowNotFound)?;
+
+            if record.status != EscrowStatus::Pending {
+                return Err(PaymentError::EscrowAlreadySettled);
+            }
+
+            record.status = EscrowStatus::Released;
+            env.storage()
+                .persistent()
+                .set(&DataKey::Escrow(id), &record);
+
+            let token_client = token::Client::new(&env, &record.token);
+            token_client.transfer(
+                &env.current_contract_address(),
+                &record.recipient,
+                &record.amount,
+            );
+
+            env.events().publish(
+                (symbol_short!("esc_rel"),),
+                (id, record.recipient.clone(), record.amount),
+            );
+            count += 1;
+        }
+
+        Ok(count)
+    }
+
     /// Admin partially releases an escrowed payment to the recipient.
     /// If partial_amount == record.amount, marks the escrow as Released.
     /// Otherwise, decrements the escrow record amount and transfers partial_amount to recipient,
