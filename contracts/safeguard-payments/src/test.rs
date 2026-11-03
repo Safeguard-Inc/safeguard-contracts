@@ -1258,3 +1258,49 @@ fn test_batch_extend_escrows() {
     let zero_res = client.try_batch_extend_escrows(&ids, &0);
     assert_eq!(zero_res, Err(Ok(PaymentError::InvalidEscrowPeriod)));
 }
+
+#[test]
+fn test_batch_release_escrows() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let sender = Address::generate(&env);
+    let rec1 = Address::generate(&env);
+    let rec2 = Address::generate(&env);
+
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &500_0000000);
+
+    // Create 2 escrows
+    let r1 = client.pay(&sender, &rec1, &token_client.address, &100_0000000);
+    let r2 = client.pay(&sender, &rec2, &token_client.address, &150_0000000);
+
+    assert_eq!(token_client.balance(&rec1), 0);
+    assert_eq!(token_client.balance(&rec2), 0);
+
+    let mut ids = Vec::new(&env);
+    ids.push_back(r1.escrow_id);
+    ids.push_back(r2.escrow_id);
+
+    // Batch release escrows 1 and 2
+    let released_count = client.batch_release_escrows(&ids);
+    assert_eq!(released_count, 2);
+
+    assert_eq!(token_client.balance(&rec1), 100_0000000);
+    assert_eq!(token_client.balance(&rec2), 150_0000000);
+
+    assert_eq!(client.get_escrow(&r1.escrow_id).status, EscrowStatus::Released);
+    assert_eq!(client.get_escrow(&r2.escrow_id).status, EscrowStatus::Released);
+
+    // Settled escrows cannot be released again
+    let settled_res = client.try_batch_release_escrows(&ids);
+    assert_eq!(settled_res, Err(Ok(PaymentError::EscrowAlreadySettled)));
+}
