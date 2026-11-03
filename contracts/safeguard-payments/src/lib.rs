@@ -205,8 +205,12 @@ impl SafeguardPayments {
         env.storage().instance().set(&DataKey::IsPaused, &false);
         env.storage().instance().set(&DataKey::EscrowCounter, &0u64);
         env.storage().instance().set(&DataKey::TotalVolume, &0i128);
-        env.storage().instance().set(&DataKey::PaymentSequence, &0u64);
-        env.storage().instance().set(&DataKey::MinPaymentAmount, &1i128);
+        env.storage()
+            .instance()
+            .set(&DataKey::PaymentSequence, &0u64);
+        env.storage()
+            .instance()
+            .set(&DataKey::MinPaymentAmount, &1i128);
         env.storage()
             .instance()
             .set(&DataKey::RequireAllowlist, &false);
@@ -274,7 +278,8 @@ impl SafeguardPayments {
     pub fn set_guardian(env: Env, guardian: Address) -> Result<(), PaymentError> {
         Self::require_admin(&env)?;
         env.storage().instance().set(&DataKey::Guardian, &guardian);
-        env.events().publish((symbol_short!("set_guard"),), guardian);
+        env.events()
+            .publish((symbol_short!("set_guard"),), guardian);
         Ok(())
     }
 
@@ -355,10 +360,8 @@ impl SafeguardPayments {
         env.storage().instance().set(&DataKey::PauseUntil, &until);
         env.storage().instance().set(&DataKey::PausedBy, &caller);
 
-        env.events().publish(
-            (symbol_short!("em_pause"),),
-            (caller, until),
-        );
+        env.events()
+            .publish((symbol_short!("em_pause"),), (caller, until));
 
         Ok(())
     }
@@ -404,11 +407,7 @@ impl SafeguardPayments {
 
     /// Set a token-specific spend cap. When set, payments in this token use this cap
     /// instead of the global default spend cap. Admin only.
-    pub fn set_token_spend_cap(
-        env: Env,
-        token: Address,
-        cap: i128,
-    ) -> Result<(), PaymentError> {
+    pub fn set_token_spend_cap(env: Env, token: Address, cap: i128) -> Result<(), PaymentError> {
         Self::require_admin(&env)?;
         if cap < 0 {
             return Err(PaymentError::InvalidAmount);
@@ -416,7 +415,8 @@ impl SafeguardPayments {
         env.storage()
             .persistent()
             .set(&DataKey::TokenSpendCap(token.clone()), &cap);
-        env.events().publish((symbol_short!("t_cap_set"),), (token, cap));
+        env.events()
+            .publish((symbol_short!("t_cap_set"),), (token, cap));
         Ok(())
     }
 
@@ -535,7 +535,9 @@ impl SafeguardPayments {
         if !env.storage().persistent().has(&key) {
             return Err(PaymentError::EscrowNotFound);
         }
-        env.storage().persistent().extend_ttl(&key, threshold, extend_to);
+        env.storage()
+            .persistent()
+            .extend_ttl(&key, threshold, extend_to);
         Ok(())
     }
 
@@ -808,7 +810,11 @@ impl SafeguardPayments {
     }
 
     /// Admin arbitrates a disputed escrow. Admin can route resolution either to the recipient or refund to the sender.
-    pub fn arbitrate_escrow(env: Env, escrow_id: u64, release_to_recipient: bool) -> Result<(), PaymentError> {
+    pub fn arbitrate_escrow(
+        env: Env,
+        escrow_id: u64,
+        release_to_recipient: bool,
+    ) -> Result<(), PaymentError> {
         Self::require_admin(&env)?;
 
         let mut record: EscrowRecord = env
@@ -959,10 +965,7 @@ impl SafeguardPayments {
     }
 
     /// Admin releases multiple active escrows to their respective recipients in bulk.
-    pub fn batch_release_escrows(
-        env: Env,
-        escrow_ids: Vec<u64>,
-    ) -> Result<u32, PaymentError> {
+    pub fn batch_release_escrows(env: Env, escrow_ids: Vec<u64>) -> Result<u32, PaymentError> {
         Self::require_admin(&env)?;
 
         let mut count = 0u32;
@@ -1048,7 +1051,12 @@ impl SafeguardPayments {
 
         env.events().publish(
             (symbol_short!("esc_part"),),
-            (escrow_id, record.recipient.clone(), partial_amount, record.amount),
+            (
+                escrow_id,
+                record.recipient.clone(),
+                partial_amount,
+                record.amount,
+            ),
         );
 
         Ok(())
@@ -1290,15 +1298,40 @@ impl SafeguardPayments {
             .ok_or(PaymentError::Unauthorized)?;
 
         let pending_admin: Option<Address> = env.storage().instance().get(&DataKey::PendingAdmin);
-        let policy_contract: Option<Address> = env.storage().instance().get(&DataKey::PolicyContract);
+        let policy_contract: Option<Address> =
+            env.storage().instance().get(&DataKey::PolicyContract);
         let guardian: Option<Address> = env.storage().instance().get(&DataKey::Guardian);
-        let escrow_period: u64 = env.storage().instance().get(&DataKey::EscrowPeriod).unwrap_or(0);
-        let spend_cap: i128 = env.storage().instance().get(&DataKey::SpendCap).unwrap_or(0);
-        let min_payment_amount: i128 = env.storage().instance().get(&DataKey::MinPaymentAmount).unwrap_or(0);
+        let escrow_period: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::EscrowPeriod)
+            .unwrap_or(0);
+        let spend_cap: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::SpendCap)
+            .unwrap_or(0);
+        let min_payment_amount: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::MinPaymentAmount)
+            .unwrap_or(0);
         let is_paused: bool = Self::is_paused(env.clone());
-        let require_allowlist: bool = env.storage().instance().get(&DataKey::RequireAllowlist).unwrap_or(false);
-        let total_volume: i128 = env.storage().instance().get(&DataKey::TotalVolume).unwrap_or(0);
-        let payment_sequence: u64 = env.storage().instance().get(&DataKey::PaymentSequence).unwrap_or(0);
+        let require_allowlist: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::RequireAllowlist)
+            .unwrap_or(false);
+        let total_volume: i128 = env
+            .storage()
+            .instance()
+            .get(&DataKey::TotalVolume)
+            .unwrap_or(0);
+        let payment_sequence: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::PaymentSequence)
+            .unwrap_or(0);
 
         Ok(PaymentGatewayConfig {
             admin,
@@ -1352,11 +1385,7 @@ impl SafeguardPayments {
     }
 
     /// Retrieve active escrows (in Pending or Disputed status) with offset and limit pagination.
-    pub fn get_active_escrows_paged(
-        env: Env,
-        offset: u32,
-        limit: u32,
-    ) -> Vec<EscrowRecord> {
+    pub fn get_active_escrows_paged(env: Env, offset: u32, limit: u32) -> Vec<EscrowRecord> {
         if limit == 0 {
             return Vec::new(&env);
         }
@@ -1376,7 +1405,8 @@ impl SafeguardPayments {
                 .persistent()
                 .get::<_, EscrowRecord>(&DataKey::Escrow(id))
             {
-                if record.status == EscrowStatus::Pending || record.status == EscrowStatus::Disputed {
+                if record.status == EscrowStatus::Pending || record.status == EscrowStatus::Disputed
+                {
                     if matched >= offset {
                         results.push_back(record);
                         if results.len() >= limit {
@@ -1546,7 +1576,10 @@ impl SafeguardPayments {
     }
 
     /// Remove multiple addresses from the denylist in a single batch transaction.
-    pub fn remove_from_denylist_batch(env: Env, addresses: Vec<Address>) -> Result<(), PaymentError> {
+    pub fn remove_from_denylist_batch(
+        env: Env,
+        addresses: Vec<Address>,
+    ) -> Result<(), PaymentError> {
         Self::require_admin(&env)?;
         for address in addresses.iter() {
             env.storage()
@@ -1661,14 +1694,17 @@ impl SafeguardPayments {
     }
 
     /// Aggregated operational and health telemetry snapshot for node indexers and compliance observers.
-    pub fn get_gateway_telemetry_snapshot(env: Env) -> Result<GatewayTelemetrySnapshot, PaymentError> {
+    pub fn get_gateway_telemetry_snapshot(
+        env: Env,
+    ) -> Result<GatewayTelemetrySnapshot, PaymentError> {
         let admin: Address = env
             .storage()
             .instance()
             .get(&DataKey::Admin)
             .ok_or(PaymentError::NotInitialized)?;
         let guardian: Option<Address> = env.storage().instance().get(&DataKey::Guardian);
-        let policy_contract: Option<Address> = env.storage().instance().get(&DataKey::PolicyContract);
+        let policy_contract: Option<Address> =
+            env.storage().instance().get(&DataKey::PolicyContract);
 
         let current_sequence = Self::get_payment_sequence(env.clone());
         let total_escrows = Self::get_escrow_count(env.clone());
@@ -1732,11 +1768,7 @@ impl SafeguardPayments {
         if !paused {
             return false;
         }
-        if let Some(until) = env
-            .storage()
-            .instance()
-            .get::<_, u64>(&DataKey::PauseUntil)
-        {
+        if let Some(until) = env.storage().instance().get::<_, u64>(&DataKey::PauseUntil) {
             if until > 0 && env.ledger().timestamp() >= until {
                 return false;
             }

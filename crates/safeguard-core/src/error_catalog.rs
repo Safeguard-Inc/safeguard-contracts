@@ -1942,7 +1942,9 @@ pub fn lookup_by_domain(domain: ErrorDomain) -> impl Iterator<Item = &'static Er
 
 /// Lookup error detail by mnemonic identifier case-insensitively.
 pub fn lookup_by_mnemonic(mnemonic: &str) -> Option<&'static ErrorDetail> {
-    ERROR_CATALOG.iter().find(|e| e.mnemonic.eq_ignore_ascii_case(mnemonic))
+    ERROR_CATALOG
+        .iter()
+        .find(|e| e.mnemonic.eq_ignore_ascii_case(mnemonic))
 }
 
 #[cfg(test)]

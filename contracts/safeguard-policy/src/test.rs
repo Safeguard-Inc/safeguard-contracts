@@ -1506,28 +1506,13 @@ fn test_policies_count_tracks_registrations() {
     let policy_a = rid(&env, "POLICY-A");
     let policy_b = rid(&env, "POLICY-B");
 
-    client.register_version(
-        &policy_a,
-        &1,
-        &config_hash(&env, 10),
-        &vec![&env],
-    );
+    client.register_version(&policy_a, &1, &config_hash(&env, 10), &vec![&env]);
     assert_eq!(client.policies_count(), 1);
 
-    client.register_version(
-        &policy_a,
-        &2,
-        &config_hash(&env, 11),
-        &vec![&env],
-    );
+    client.register_version(&policy_a, &2, &config_hash(&env, 11), &vec![&env]);
     assert_eq!(client.policies_count(), 1);
 
-    client.register_version(
-        &policy_b,
-        &1,
-        &config_hash(&env, 20),
-        &vec![&env],
-    );
+    client.register_version(&policy_b, &1, &config_hash(&env, 20), &vec![&env]);
     assert_eq!(client.policies_count(), 2);
 }
 
@@ -1549,12 +1534,7 @@ fn test_active_policy_query_entrypoints() {
     assert_eq!(client.get_active_version_number(&policy), None);
 
     // 2. Register draft version 1
-    client.register_version(
-        &policy,
-        &1,
-        &config_hash(&env, 1),
-        &vec![&env],
-    );
+    client.register_version(&policy, &1, &config_hash(&env, 1), &vec![&env]);
     assert_eq!(client.is_policy_active(&policy), false);
     assert_eq!(client.get_active_version_number(&policy), None);
 
@@ -1581,12 +1561,7 @@ fn test_bound_tokens_count() {
     client.initialize(&admin);
 
     let policy = rid(&env, "POL-TOKEN-COUNT");
-    client.register_version(
-        &policy,
-        &1,
-        &config_hash(&env, 1),
-        &vec![&env],
-    );
+    client.register_version(&policy, &1, &config_hash(&env, 1), &vec![&env]);
 
     assert_eq!(client.bound_tokens_count(&policy), 0);
 
@@ -1618,12 +1593,7 @@ fn test_batch_is_authorized() {
     client.initialize(&admin);
 
     let policy = rid(&env, "POL-BATCH-AUTH");
-    client.register_version(
-        &policy,
-        &1,
-        &config_hash(&env, 1),
-        &vec![&env],
-    );
+    client.register_version(&policy, &1, &config_hash(&env, 1), &vec![&env]);
     client.activate_version(&admin, &policy, &1);
 
     let token = Address::generate(&env);
@@ -1633,7 +1603,13 @@ fn test_batch_is_authorized() {
     let bob = Address::generate(&env);
 
     // Alice is active verified; Bob has no identity record
-    client.set_identity(&admin, &alice, &AccountStatus::Active.to_code(), &rid(&env, "ATT-ALICE"), &0);
+    client.set_identity(
+        &admin,
+        &alice,
+        &AccountStatus::Active.to_code(),
+        &rid(&env, "ATT-ALICE"),
+        &0,
+    );
 
     let batch = vec![&env, alice.clone(), bob.clone()];
     let results = client.batch_is_authorized(&batch, &token);
@@ -1662,22 +1638,40 @@ fn test_batch_identity() {
     let bob = Address::generate(&env);
     let charlie = Address::generate(&env);
 
-    client.set_identity(&admin, &alice, &AccountStatus::Active.to_code(), &rid(&env, "ATT-ALICE"), &0);
-    client.set_identity(&admin, &charlie, &AccountStatus::Suspended.to_code(), &rid(&env, "ATT-CHARLIE"), &1_900_000_000);
+    client.set_identity(
+        &admin,
+        &alice,
+        &AccountStatus::Active.to_code(),
+        &rid(&env, "ATT-ALICE"),
+        &0,
+    );
+    client.set_identity(
+        &admin,
+        &charlie,
+        &AccountStatus::Suspended.to_code(),
+        &rid(&env, "ATT-CHARLIE"),
+        &1_900_000_000,
+    );
 
     let query = vec![&env, alice.clone(), bob.clone(), charlie.clone()];
     let results = client.batch_identity(&query);
 
     assert_eq!(results.len(), 3);
     assert!(results.get(0).unwrap().is_some());
-    assert_eq!(results.get(0).unwrap().unwrap().status, AccountStatus::Active.to_code());
+    assert_eq!(
+        results.get(0).unwrap().unwrap().status,
+        AccountStatus::Active.to_code()
+    );
 
     // Bob has no identity record
     assert!(results.get(1).unwrap().is_none());
 
     // Charlie has suspended identity record
     assert!(results.get(2).unwrap().is_some());
-    assert_eq!(results.get(2).unwrap().unwrap().status, AccountStatus::Suspended.to_code());
+    assert_eq!(
+        results.get(2).unwrap().unwrap().status,
+        AccountStatus::Suspended.to_code()
+    );
 }
 
 #[test]
@@ -1782,7 +1776,10 @@ fn test_batch_sanctions() {
 
     assert_eq!(results.len(), 3);
     assert!(results.get(0).unwrap().is_some());
-    assert_eq!(results.get(0).unwrap().unwrap().status, SanctionsStatus::Active.to_code());
+    assert_eq!(
+        results.get(0).unwrap().unwrap().status,
+        SanctionsStatus::Active.to_code()
+    );
     assert!(results.get(1).unwrap().is_none());
     assert!(results.get(2).unwrap().is_some());
     assert_eq!(results.get(2).unwrap().unwrap().dataset_version, 2);
@@ -1925,7 +1922,13 @@ fn test_batch_has_role_and_metadata() {
     client.add_policy_authority(&pol_auth);
 
     // Test batch_has_role: admin, reg_auth, pol_auth should have role; stranger should not
-    let accounts = vec![&env, admin.clone(), reg_auth.clone(), pol_auth.clone(), stranger.clone()];
+    let accounts = vec![
+        &env,
+        admin.clone(),
+        reg_auth.clone(),
+        pol_auth.clone(),
+        stranger.clone(),
+    ];
     let roles = client.batch_has_role(&accounts);
     assert_eq!(roles.len(), 4);
     assert_eq!(roles.get(0).unwrap(), true);

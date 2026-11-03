@@ -170,7 +170,12 @@ pub fn bound_tokens_count(env: &Env, policy_id: &BytesN<32>) -> u32 {
 }
 
 /// The tokens currently bound to a policy with offset and limit pagination (public read).
-pub fn bound_tokens_paged(env: &Env, policy_id: &BytesN<32>, offset: u32, limit: u32) -> Vec<Address> {
+pub fn bound_tokens_paged(
+    env: &Env,
+    policy_id: &BytesN<32>,
+    offset: u32,
+    limit: u32,
+) -> Vec<Address> {
     let all = storage::token_bindings(env, policy_id);
     let total = all.len();
     if offset >= total || limit == 0 {

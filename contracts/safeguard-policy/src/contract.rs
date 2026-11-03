@@ -159,11 +159,7 @@ impl PolicyContract {
 
     /// Check whether multiple accounts hold a specific administrative role:
     /// 1 = Admin, 2 = Registry Authority, 3 = Policy Authority, 4+ = Any Role.
-    pub fn batch_has_role_authority(
-        env: Env,
-        role_type: u32,
-        accounts: Vec<Address>,
-    ) -> Vec<bool> {
+    pub fn batch_has_role_authority(env: Env, role_type: u32, accounts: Vec<Address>) -> Vec<bool> {
         let admin_opt = Self::admin(env.clone()).ok();
         let mut results = Vec::new(&env);
         for acc in accounts.iter() {
@@ -289,10 +285,7 @@ impl PolicyContract {
     }
 
     /// Retrieve active version numbers for multiple policies in a single batch query (public read).
-    pub fn batch_active_version(
-        env: Env,
-        policy_ids: Vec<BytesN<32>>,
-    ) -> Vec<Option<u32>> {
+    pub fn batch_active_version(env: Env, policy_ids: Vec<BytesN<32>>) -> Vec<Option<u32>> {
         let mut results = Vec::new(&env);
         for id in policy_ids.iter() {
             results.push_back(storage::active_version(&env, &id));

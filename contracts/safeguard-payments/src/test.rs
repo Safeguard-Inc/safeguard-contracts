@@ -754,7 +754,10 @@ fn test_arbitrate_escrow() {
 
     let mut q1 = Vec::new(&env);
     q1.push_back(1);
-    assert_eq!(client.get_escrows_batch(&q1).get(0).unwrap().status, EscrowStatus::Released);
+    assert_eq!(
+        client.get_escrows_batch(&q1).get(0).unwrap().status,
+        EscrowStatus::Released
+    );
 
     // Cannot arbitrate already settled escrow
     let err = client.try_arbitrate_escrow(&1, &false);
@@ -771,7 +774,10 @@ fn test_arbitrate_escrow() {
 
     let mut q2 = Vec::new(&env);
     q2.push_back(2);
-    assert_eq!(client.get_escrows_batch(&q2).get(0).unwrap().status, EscrowStatus::Refunded);
+    assert_eq!(
+        client.get_escrows_batch(&q2).get(0).unwrap().status,
+        EscrowStatus::Refunded
+    );
 }
 
 #[test]
@@ -1195,11 +1201,17 @@ fn test_extend_dispute_period() {
     // 1. Extend while Pending
     let new_release = client.extend_dispute_period(&receipt.escrow_id, &1800);
     assert_eq!(new_release, initial_release_after + 1800);
-    assert_eq!(client.get_escrow(&receipt.escrow_id).release_after, initial_release_after + 1800);
+    assert_eq!(
+        client.get_escrow(&receipt.escrow_id).release_after,
+        initial_release_after + 1800
+    );
 
     // 2. Put into Disputed status
     client.dispute_escrow(&sender, &receipt.escrow_id);
-    assert_eq!(client.get_escrow(&receipt.escrow_id).status, EscrowStatus::Disputed);
+    assert_eq!(
+        client.get_escrow(&receipt.escrow_id).status,
+        EscrowStatus::Disputed
+    );
 
     // 3. Extend while Disputed
     let disputed_release = client.extend_dispute_period(&receipt.escrow_id, &3600);
@@ -1211,7 +1223,10 @@ fn test_extend_dispute_period() {
 
     // 5. Arbitrate and resolve
     client.arbitrate_escrow(&receipt.escrow_id, &true);
-    assert_eq!(client.get_escrow(&receipt.escrow_id).status, EscrowStatus::Released);
+    assert_eq!(
+        client.get_escrow(&receipt.escrow_id).status,
+        EscrowStatus::Released
+    );
 
     // 6. Cannot extend settled escrow
     let settled_res = client.try_extend_dispute_period(&receipt.escrow_id, &1000);
@@ -1297,8 +1312,14 @@ fn test_batch_release_escrows() {
     assert_eq!(token_client.balance(&rec1), 100_0000000);
     assert_eq!(token_client.balance(&rec2), 150_0000000);
 
-    assert_eq!(client.get_escrow(&r1.escrow_id).status, EscrowStatus::Released);
-    assert_eq!(client.get_escrow(&r2.escrow_id).status, EscrowStatus::Released);
+    assert_eq!(
+        client.get_escrow(&r1.escrow_id).status,
+        EscrowStatus::Released
+    );
+    assert_eq!(
+        client.get_escrow(&r2.escrow_id).status,
+        EscrowStatus::Released
+    );
 
     // Settled escrows cannot be released again
     let settled_res = client.try_batch_release_escrows(&ids);
@@ -1398,8 +1419,14 @@ fn test_batch_refund_escrows() {
 
     // Balances returned to sender
     assert_eq!(token_client.balance(&sender), 500_0000000);
-    assert_eq!(client.get_escrow(&r1.escrow_id).status, EscrowStatus::Refunded);
-    assert_eq!(client.get_escrow(&r2.escrow_id).status, EscrowStatus::Refunded);
+    assert_eq!(
+        client.get_escrow(&r1.escrow_id).status,
+        EscrowStatus::Refunded
+    );
+    assert_eq!(
+        client.get_escrow(&r2.escrow_id).status,
+        EscrowStatus::Refunded
+    );
 
     // Subsequent batch refund fails as already settled
     let reserialized = client.try_batch_refund_escrows(&admin, &ids);
@@ -1481,8 +1508,14 @@ fn test_batch_dispute_escrows() {
     let disputed_count = client.batch_dispute_escrows(&sender, &ids);
     assert_eq!(disputed_count, 2);
 
-    assert_eq!(client.get_escrow(&r1.escrow_id).status, EscrowStatus::Disputed);
-    assert_eq!(client.get_escrow(&r2.escrow_id).status, EscrowStatus::Disputed);
+    assert_eq!(
+        client.get_escrow(&r1.escrow_id).status,
+        EscrowStatus::Disputed
+    );
+    assert_eq!(
+        client.get_escrow(&r2.escrow_id).status,
+        EscrowStatus::Disputed
+    );
 
     // Subsequent batch dispute fails because they are no longer Pending
     let reserialized = client.try_batch_dispute_escrows(&sender, &ids);
@@ -1519,16 +1552,28 @@ fn test_batch_arbitrate_escrows() {
 
     // Dispute both escrows
     client.batch_dispute_escrows(&sender, &ids);
-    assert_eq!(client.get_escrow(&r1.escrow_id).status, EscrowStatus::Disputed);
-    assert_eq!(client.get_escrow(&r2.escrow_id).status, EscrowStatus::Disputed);
+    assert_eq!(
+        client.get_escrow(&r1.escrow_id).status,
+        EscrowStatus::Disputed
+    );
+    assert_eq!(
+        client.get_escrow(&r2.escrow_id).status,
+        EscrowStatus::Disputed
+    );
 
     // Since mock_all_auths is on, let's verify admin call succeeds
     let arbitrated_count = client.batch_arbitrate_escrows(&ids, &true);
     assert_eq!(arbitrated_count, 2);
 
     // Both settled to Released and tokens received by recipients
-    assert_eq!(client.get_escrow(&r1.escrow_id).status, EscrowStatus::Released);
-    assert_eq!(client.get_escrow(&r2.escrow_id).status, EscrowStatus::Released);
+    assert_eq!(
+        client.get_escrow(&r1.escrow_id).status,
+        EscrowStatus::Released
+    );
+    assert_eq!(
+        client.get_escrow(&r2.escrow_id).status,
+        EscrowStatus::Released
+    );
     assert_eq!(token_client.balance(&rec1), 100_0000000);
     assert_eq!(token_client.balance(&rec2), 150_0000000);
 

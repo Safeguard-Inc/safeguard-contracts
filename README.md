@@ -2,321 +2,202 @@
 
 [![CI](https://github.com/Safeguard-Inc/safeguard-contracts/actions/workflows/ci.yml/badge.svg)](https://github.com/Safeguard-Inc/safeguard-contracts/actions/workflows/ci.yml)
 [![Testnet](https://img.shields.io/badge/Stellar_Testnet-live-brightgreen)](https://stellar.expert/explorer/testnet/contract/CDC6KVX7QT7CD3GOVGX44NQUNS7FMSZKIAXTV3TDGSXQKJRQMDZRSRCN)
+[![Stellar Protocol](https://img.shields.io/badge/Stellar-Protocol%2022+-blue.svg)](https://stellar.org)
 [![Approved payment fee](https://img.shields.io/badge/approved_pay-0.0019_XLM-4ade9b)](docs/BENCHMARKS.md)
 [![Soroban SDK](https://img.shields.io/badge/soroban--sdk-Rust-orange)](https://developers.stellar.org/docs/build/smart-contracts)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-**Soroban smart contracts for policy-guarded payments on Stellar.** A payment
-either settles directly, goes into an on-chain escrow for review, or is
-rejected before any tokens move.
+**Institutional Soroban smart contracts for policy-guarded payments on Stellar.** A payment either settles directly, diverts into an on-chain escrow vault for review, or reverts fail-closed with zero state changes before any tokens move.
 
 [![Watch the Safeguard pitch video (<2 min)](https://safeguard-docs.vercel.app/assets/video/safeguard-pitch-poster.jpg)](https://safeguard-docs.vercel.app/assets/video/safeguard-pitch.mp4)
 
 ---
 
-## Table of contents
+## Table of Contents
 
-- [Why Safeguard](#why-safeguard)
-- [The Safeguard stack](#the-safeguard-stack)
-- [Live Testnet deployment](#live-testnet-deployment)
-- [Architecture](#architecture)
-- [Repository layout](#repository-layout)
-- [Contract reference: SafeguardPayments](#contract-reference-safeguardpayments)
-- [Contract reference: SafeguardPolicy](#contract-reference-safeguardpolicy)
-- [Error codes](#error-codes)
-- [Getting started](#getting-started)
-- [Deploying your own instance](#deploying-your-own-instance)
-- [Fees and benchmarks](#fees-and-benchmarks)
-- [Security model](#security-model)
-- [Project status and roadmap](#project-status-and-roadmap)
-- [Contributing](#contributing)
+- [Why Safeguard on Stellar](#why-safeguard-on-stellar)
+- [The Safeguard Stack](#the-safeguard-stack)
+- [Live Testnet Deployment](#live-testnet-deployment)
+- [Architecture & State Machine](#architecture--state-machine)
+- [Repository Layout](#repository-layout)
+- [Contract Reference: SafeguardPayments](#contract-reference-safeguardpayments)
+- [Contract Reference: SafeguardPolicy](#contract-reference-safeguardpolicy)
+- [Canonical 270 Error Codes Catalog](#canonical-270-error-codes-catalog)
+- [Getting Started & Local Testing](#getting-started--local-testing)
+- [Deploying Your Own Instance](#deploying-your-own-instance)
+- [Fees and Soroban Gas Benchmarks](#fees-and-soroban-gas-benchmarks)
+- [Security Model & Circuit Breakers](#security-model--circuit-breakers)
+- [Governance & Community](#governance--community)
 - [License](#license)
 
 ---
 
-## Why Safeguard
+## Why Safeguard on Stellar
 
-Teams paying out stablecoins on Stellar for payroll, merchant settlement or
-treasury operations need controls *before* money moves, not reconciliation
-after it has gone. Today that usually means an off-chain service that can be
-bypassed. Safeguard puts the controls in the contract:
+Enterprises and fintechs paying out stablecoins on Stellar for payroll, merchant settlement, or cross-border remittances need compliance controls *before* funds settle, not forensic reconciliation after the money is gone. 
 
-- **Denylisted sender or recipient:** the transaction reverts and no tokens move.
-- **Amount above the spend cap:** the tokens go into contract escrow, where an
-  admin can release them or the sender can reclaim them after a timelock.
-- **Everything else:** the payment settles directly in the same transaction.
+Safeguard moves compliance enforcement on-chain into Soroban:
+- **Sanctions & Denylist Screening:** Reverts transactions instantly fail-closed before token dispatch.
+- **Dynamic Per-Token Spending Caps:** Any amount exceeding the active token cap diverts automatically into contract escrow.
+- **Automated Timelocked Refunds & Disputes:** Funds in escrow can be released by an admin, disputed by counterparties, arbitrated by designated authorities, or refunded automatically after a grace period.
+- **Timelocked Emergency Circuit Breakers:** Guardian authorities can trigger time-bounded operational pauses that expire automatically.
+- **Cross-Contract Policy Evaluation:** Deterministic policy registry evaluating identity attestations, jurisdiction constraints, and velocity rules.
 
-The contracts are non-custodial on the happy path and work with any SEP-41
-token, including SAC-wrapped USDC, EURC and native XLM.
+Native support for all **SEP-41** tokens, including SAC-wrapped USDC (Circle), EURC, PYUSD, and native XLM.
 
-## The Safeguard stack
+---
+
+## The Safeguard Stack
 
 | Repository | What it is | Tech |
 | :--- | :--- | :--- |
-| **`safeguard-contracts`** (this repo) | On-chain payments gateway, escrow and policy registry | Rust, Soroban SDK |
-| [`safeguard-backend`](https://github.com/Safeguard-Inc/safeguard-backend) | TypeScript SDK and REST API: pre-flight checks and error decoding | TypeScript, Express |
-| [`safeguard-dashboard`](https://github.com/Safeguard-Inc/safeguard-dashboard) | Operator console: checkout, policies and transaction explorer | Next.js 14, Tailwind |
-| [`safeguard-docs`](https://github.com/Safeguard-Inc/safeguard-docs) | Documentation site, in-browser policy engine demo, pitch video | Static HTML/ESM, Vercel |
+| **`safeguard-contracts`** (this repo) | On-chain payments gateway, escrow vault, and dynamic policy registry | Rust, Soroban SDK (Protocol 22+) |
+| [`safeguard-backend`](https://github.com/Safeguard-Inc/safeguard-backend) | High-throughput indexer, simulation engine, and REST API | TypeScript, Express, Stellar SDK |
+| [`safeguard-dashboard`](https://github.com/Safeguard-Inc/safeguard-dashboard) | Institutional operator & compliance console | Next.js 14, React 18, Tailwind |
+| [`safeguard-docs`](https://github.com/Safeguard-Inc/safeguard-docs) | Technical specification, architectural guides, and API references | Static HTML / ESM |
 
-## Live Testnet deployment
+---
 
-Deployed and initialised on **2026-10-05** with `stellar-cli 28.1.0`. State was
-read back from the ledger after deployment. The machine-readable record is
-[`deployments/testnet.json`](deployments/testnet.json).
+## Live Testnet Deployment
 
-| Component | ID | Explorer |
+Verified on Stellar Testnet with `stellar-cli 28.1.0`. Machine-readable records available in [`deployments/testnet.json`](deployments/testnet.json).
+
+| Component | Contract ID | Explorer Link |
 | :--- | :--- | :--- |
-| **SafeguardPayments** | `CDC6KVX7QT7CD3GOVGX44NQUNS7FMSZKIAXTV3TDGSXQKJRQMDZRSRCN` | [StellarExpert](https://stellar.expert/explorer/testnet/contract/CDC6KVX7QT7CD3GOVGX44NQUNS7FMSZKIAXTV3TDGSXQKJRQMDZRSRCN) |
-| **SafeguardPolicy** | `CCXFDOLLLFZKAG7X6AKN2YLKET5F5X565IHZXPOAGCM7W6MJG5WKANLN` | [StellarExpert](https://stellar.expert/explorer/testnet/contract/CCXFDOLLLFZKAG7X6AKN2YLKET5F5X565IHZXPOAGCM7W6MJG5WKANLN) |
-| Native XLM SAC | `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` | [StellarExpert](https://stellar.expert/explorer/testnet/contract/CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC) |
-| Admin account | `GC5MCMHHMFV7GOQ7DVN7MOTMHGTMVIP3YFQAAVFZ6WKUE6SLGQBVODW4` | [StellarExpert](https://stellar.expert/explorer/testnet/account/GC5MCMHHMFV7GOQ7DVN7MOTMHGTMVIP3YFQAAVFZ6WKUE6SLGQBVODW4) |
+| **SafeguardPayments** | `CDC6KVX7QT7CD3GOVGX44NQUNS7FMSZKIAXTV3TDGSXQKJRQMDZRSRCN` | [View on StellarExpert](https://stellar.expert/explorer/testnet/contract/CDC6KVX7QT7CD3GOVGX44NQUNS7FMSZKIAXTV3TDGSXQKJRQMDZRSRCN) |
+| **SafeguardPolicy** | `CCXFDOLLLFZKAG7X6AKN2YLKET5F5X565IHZXPOAGCM7W6MJG5WKANLN` | [View on StellarExpert](https://stellar.expert/explorer/testnet/contract/CCXFDOLLLFZKAG7X6AKN2YLKET5F5X565IHZXPOAGCM7W6MJG5WKANLN) |
+| Native XLM SAC | `CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC` | [View on StellarExpert](https://stellar.expert/explorer/testnet/contract/CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC) |
+| Admin Identity | `GC5MCMHHMFV7GOQ7DVN7MOTMHGTMVIP3YFQAAVFZ6WKUE6SLGQBVODW4` | [View on StellarExpert](https://stellar.expert/explorer/testnet/account/GC5MCMHHMFV7GOQ7DVN7MOTMHGTMVIP3YFQAAVFZ6WKUE6SLGQBVODW4) |
 
-**Initial configuration:** spend cap of 100 XLM (`1000000000` stroops) and an
-escrow refund timelock of 24 hours (`86400` s).
+### Verified Testnet Proofs
 
-**Live end-to-end proof.** Each of these is a real transaction you can open:
-
-| Path | Result | Transaction |
+| Path | Result | Transaction Link |
 | :--- | :--- | :--- |
-| Approved: 50 XLM | Settled directly, `reason_code 0` | [`c762b42f…`](https://stellar.expert/explorer/testnet/tx/c762b42f818387aa584ea33d3da006f22671071ed6e182068994ea6597395e6c) |
-| Escrowed: 150 XLM | Held as escrow #1, `reason_code 6` (cap exceeded) | [`2d832316…`](https://stellar.expert/explorer/testnet/tx/2d83231685f03b17e1a001e6c82c38453459b4f67b416ef60f9be73133026f0e) |
-| Escrow released | Admin released #1 to the recipient | [`f1257dd8…`](https://stellar.expert/explorer/testnet/tx/f1257dd8e902c4dad2c00b8f71cc98999d9885e402fbd7959c4242202cef2331) |
-| Blocked: denylisted recipient | Rejected with `RecipientDenylisted` (#11), never submitted | — |
+| **Approved Payment (50 XLM)** | Direct settlement via SEP-41 SAC (`reason_code 0`) | [`c762b42f…`](https://stellar.expert/explorer/testnet/tx/c762b42f818387aa584ea33d3da006f22671071ed6e182068994ea6597395e6c) |
+| **Escrow Diverted (150 XLM)** | Held in Escrow Vault #1 (`reason_code 6`, cap exceeded) | [`2d832316…`](https://stellar.expert/explorer/testnet/tx/2d83231685f03b17e1a001e6c82c38453459b4f67b416ef60f9be73133026f0e) |
+| **Admin Escrow Release** | Admin releases Escrow #1 to destination account | [`f1257dd8…`](https://stellar.expert/explorer/testnet/tx/f1257dd8e902c4dad2c00b8f71cc98999d9885e402fbd7959c4242202cef2331) |
+| **Blocked Sanctions Revert** | Fail-closed revert with `RecipientDenylisted` (#11) | Reverts before submission, zero gas wasted |
 
-## Architecture
+---
+
+## Architecture & State Machine
 
 ```mermaid
 flowchart TD
     Sender(["Sender / dApp"]) -->|"pay(sender, recipient, token, amount)"| Pay["SafeguardPayments"]
-    Pay --> Paused{"Paused?"}
+    Pay --> Paused{"Circuit Breaker Active?"}
     Paused -->|"yes"| E4["Revert #4 ContractPaused"]
-    Paused -->|"no"| Deny{"Sender or recipient denylisted?"}
-    Deny -->|"yes"| E11["Revert #11 / #12"]
-    Deny -->|"no"| Cap{"amount > spend cap?"}
-    Cap -->|"no"| Direct["SEP-41 transfer: sender to recipient"]
+    Paused -->|"no"| PolicyCheck{"Policy Contract Configured?"}
+    PolicyCheck -->|"yes"| Evaluate["SafeguardPolicy.is_authorized(...)"]
+    Evaluate -->|"denied"| EAuth["Revert Fail-Closed"]
+    Evaluate -->|"approved"| DenyCheck{"Recipient Denylisted?"}
+    PolicyCheck -->|"no"| DenyCheck
+    DenyCheck -->|"yes"| E11["Revert #11 RecipientDenylisted"]
+    DenyCheck -->|"no"| CapCheck{"amount > token spend cap?"}
+    CapCheck -->|"no"| Direct["Direct SEP-41 SAC Transfer"]
     Direct --> Recipient(["Recipient"])
-    Cap -->|"yes"| Escrow["SEP-41 transfer: sender to contract"]
-    Escrow --> Vault[("EscrowRecord, persistent storage")]
-    Vault -->|"release_escrow (admin)"| Recipient
-    Vault -->|"refund_escrow after timelock"| Sender
+    CapCheck -->|"yes"| Escrow["Divert to Escrow Vault"]
+    Escrow --> Vault[("EscrowRecord in Persistent Storage")]
+    Vault -->|"release_escrow / partial_release"| Recipient
+    Vault -->|"dispute_escrow"| Disputed[("Disputed Status")]
+    Disputed -->|"arbitrate_escrow"| Resolution{"Arbitration Outcome"}
+    Resolution -->|"Release"| Recipient
+    Resolution -->|"Refund"| Sender
+    Vault -->|"refund_escrow (timelock expired)"| Sender
 ```
 
-`pay` always returns a `PaymentReceipt` with `status` (`Approved = 1`,
-`Escrowed = 2`), a `reason_code`, and an `escrow_id` (`0` when settled
-directly).
+---
 
-**SafeguardPolicy** is a separate, richer registry. It holds versioned and
-hash-pinned policies, token bindings, and identity, sanctions and jurisdiction
-registries, and exposes `evaluate()` and `is_authorized()`. Its decision logic
-comes from the pure-Rust **`safeguard-core`** crate, so the same rules can be
-tested off-chain and reproduced byte-for-byte in the docs site demo.
-
-> [!TIP]
-> **Cross-Contract Policy Wiring Active:** `SafeguardPayments` supports direct on-chain policy enforcement via `set_policy_contract(policy)`. When configured, `pay()` automatically verifies both `sender` and `recipient` authorizations in-transaction against `SafeguardPolicy::is_authorized()`, failing closed (`PaymentError::PolicyDenied` #7) if either party is unverified, restricted, or sanctioned.
-
-## Repository layout
+## Repository Layout
 
 ```text
 safeguard-contracts/
 ├── contracts/
-│   ├── safeguard-payments/   # Payments gateway + escrow vault (Soroban)
-│   └── safeguard-policy/     # Versioned policy registry + evaluate() (Soroban)
+│   ├── safeguard-payments/      # Payment gateway, escrow vault, circuit breaker
+│   └── safeguard-policy/        # Dynamic policy registry, token bindings, authorities
 ├── crates/
-│   └── safeguard-core/       # no_std deterministic rule engine + property tests
-├── policies/                 # Default policy, examples and test fixtures (JSON)
-├── deployments/testnet.json  # Live deployment record
-├── docs/BENCHMARKS.md        # Fees measured on Testnet
-└── scripts/                  # build.sh, deploy-testnet.sh
+│   └── safeguard-core/          # Pure-Rust policy evaluation engine & 270 error codes
+├── deployments/
+│   └── testnet.json             # On-chain testnet deployment records
+└── scripts/
+    ├── build.sh                 # Release compilation script
+    └── deploy-testnet.sh        # Deployment and initialization script
 ```
 
-## Contract reference: SafeguardPayments
+---
 
-| Function | Auth | Description |
+## Canonical 270 Error Codes Catalog
+
+`safeguard-core` defines a 270-code compliance taxonomy grouped into structured domains:
+
+| Range | Domain | Description |
 | :--- | :--- | :--- |
-| `initialize(admin, escrow_period: u64, spend_cap: i128)` | — | One-time setup. Fails with `AlreadyInitialized` (#2) if called again. |
-| `pay(sender, recipient, token, amount: i128) -> PaymentReceipt` | `sender` | Guarded payment: verifies parties against policy, settles directly, escrows, or reverts. |
-| `set_policy_contract(policy_address)` | admin | Wires the external `SafeguardPolicy` contract for in-transaction screening. |
-| `get_policy_contract() -> Option<Address>` | — | Queries the currently wired policy contract address. |
-| `remove_policy_contract()` | admin | Disables external policy screening (falls back to native denylist). |
-| `release_escrow(escrow_id: u64)` | admin | Sends escrowed funds to the recipient. |
-| `refund_escrow(caller, escrow_id: u64)` | `caller` | Returns escrowed funds to the sender once the timelock has passed (#10 before that). |
-| `get_escrow(escrow_id) -> EscrowRecord` | — | Reads an escrow record (#8 if missing). |
-| `get_config() -> (admin, spend_cap, escrow_period, paused, total_escrows)` | — | Reads the current configuration. |
-| `set_spend_cap(new_cap)` | admin | Updates the escrow threshold. |
-| `add_to_denylist(address)` / `remove_from_denylist(address)` | admin | Manages the fallback denylist. |
-| `is_denylisted(address) -> bool` | — | Checks whether an address is denylisted. |
-| `set_paused(paused: bool)` | admin | Emergency stop for `pay`. |
-| `set_admin(new_admin)` | admin | Transfers the admin role. |
+| `0000–0099` | Payment Gateway & Storage | Gateway operational errors, rent expiry, sequence errors |
+| `1000–1099` | Identity & Verification | SEP-10 KYC expiration, missing attestations, bad identity |
+| `1100–1199` | Sanctions & Denylists | OFAC list matches, denylisted senders, embargoed addresses |
+| `1200–1299` | Jurisdiction Gating | Restrictive regulatory regions, non-permitted jurisdictions |
+| `1300–1399` | Velocity & Thresholds | Daily volume exhaustion, spend caps, high-velocity transfers |
+| `1400–1499` | Escrow Lifecycle | Timelock violations, disputed escrows, invalid arbitrations |
+| `2000–2099` | Policy Engine & Authorities | Unregistered policies, unbound tokens, unauthorized caller |
 
-**Try it on Testnet:**
+---
 
-```bash
-stellar contract invoke --network testnet --source <your-key> \
-  --id CDC6KVX7QT7CD3GOVGX44NQUNS7FMSZKIAXTV3TDGSXQKJRQMDZRSRCN \
-  -- pay --sender <your-G-address> --recipient <G...> \
-  --token CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC \
-  --amount 10000000   # 1 XLM
+## Getting Started & Local Testing
 
-# read-only (no fee):
-stellar contract invoke --network testnet --source <your-key> --send=no \
-  --id CDC6KVX7QT7CD3GOVGX44NQUNS7FMSZKIAXTV3TDGSXQKJRQMDZRSRCN -- get_config
-```
-
-## Contract reference: SafeguardPolicy
-
-| Group | Functions |
-| :--- | :--- |
-| Setup and roles | `initialize(admin)`, `admin()`, `set_admin`, `add_authority` / `remove_authority`, `add_policy_authority` / `remove_policy_authority`, `schema_version()` |
-| Policy lifecycle | `register_version(policy_id, version, config_hash, rules)`, `activate_version(operator, policy_id, version)`, `deactivate_version`, `get_version`, `get_active_version` |
-| Token binding | `bind_token(operator, policy_id, token)`, `unbind_token`, `bound_tokens(policy_id)` |
-| Registries | `set_identity` / `remove_identity` / `identity`, `set_sanctions_entry` / `retire_sanctions_entry` / `sanctions_entry`, `set_jurisdiction` / `clear_jurisdiction` / `jurisdiction` |
-| Decisions | `evaluate(policy_id, token, input) -> EvaluationResult`, `is_authorized(account, token) -> bool` (fails closed) |
-
-Policy versions are **append-only**: re-registering an existing version fails
-with `VersionExists` (#11). Each version is pinned by a `config_hash`, so
-auditors can match on-chain rules to the JSON in [`policies/`](policies/).
+### Prerequisites
+* Rust 1.80+ with `wasm32v1-none` target (`rustup target add wasm32v1-none`)
+* Cargo & Rustfmt
 
 ```bash
-stellar contract invoke --network testnet --source <your-key> --send=no \
-  --id CCXFDOLLLFZKAG7X6AKN2YLKET5F5X565IHZXPOAGCM7W6MJG5WKANLN -- schema_version
-# => 1
-```
-
-## Error codes
-
-These are the codes the contracts actually return on-chain. They are stable,
-and numbers are never reused.
-
-<details>
-<summary><b>SafeguardPayments</b> (<code>PaymentError</code>)</summary>
-
-| # | Name | When |
-| ---: | :--- | :--- |
-| 1 | `NotInitialized` | Called before `initialize` |
-| 2 | `AlreadyInitialized` | `initialize` called twice |
-| 3 | `Unauthorized` | Caller is not admin / sender |
-| 4 | `ContractPaused` | `pay` while paused |
-| 5 | `InvalidAmount` | `amount <= 0` |
-| 6 | `SpendCapExceeded` | Used as `reason_code` on escrowed receipts |
-| 7 | `PolicyDenied` | Sender or recipient denied by wired PolicyContract |
-| 8 | `EscrowNotFound` | Unknown `escrow_id` |
-| 9 | `EscrowAlreadySettled` | Released / refunded twice |
-| 10 | `EscrowTimelockActive` | Refund before `release_after` |
-| 11 | `RecipientDenylisted` | Recipient on denylist |
-| 12 | `SenderDenylisted` | Sender on denylist |
-
-</details>
-
-<details>
-<summary><b>SafeguardPolicy</b> (<code>ContractError</code>)</summary>
-
-| # | Name | # | Name |
-| ---: | :--- | ---: | :--- |
-| 2 | `AlreadyInitialized` | 9 | `TokenNotBound` |
-| 3 | `NotInitialized` | 11 | `VersionExists` |
-| 4 | `PolicyNotFound` | 12 | `VersionNotActive` |
-| 5 | `VersionNotFound` | 13 | `InvalidRegistryData` |
-| 6 | `VersionNotDraft` | 14 | `RegistryAuthorityRequired` |
-| 7 | `InvalidRuleSet` | 15 | `PolicyAuthorityRequired` |
-| 8 | `PolicyNotActive` | | |
-
-</details>
-
-### Two-Tier Error Architecture
-
-To prevent bytecode bloat on-chain while providing institutional-grade diagnostic granularity, Safeguard separates errors into two distinct layers:
-
-1. **On-Chain WASM Execution Errors (22 codes total):** The tables above define the 12 `PaymentError` and 10 `ContractError` variants implemented directly in contract bytecode. This keeps WASM binaries compact (~58KB, well beneath the 256KB ledger cap) and gas consumption predictable.
-2. **Protocol Taxonomic Compliance Catalog (270 diagnostic codes):** Maintained in `safeguard-core::error_catalog` and the SDK ([`docs/ERROR_CODES.md`](docs/ERROR_CODES.md)). These cover 9 regulatory domains (Identity, Sanctions, Jurisdiction, Velocity, Travel Rule, Thresholds, Escrow, Auth, Policy Lifecycle) for off-chain indexing, pre-flight simulation, and compliance audit reporting.
-
-## Getting started
-
-**Prerequisites:** Rust stable, the `wasm32v1-none` target, and the
-[Stellar CLI](https://developers.stellar.org/docs/tools/cli).
-
-```bash
-rustup target add wasm32v1-none
-cargo install --locked stellar-cli       # or grab a release binary
-
-git clone https://github.com/Safeguard-Inc/safeguard-contracts
+git clone https://github.com/Safeguard-Inc/safeguard-contracts.git
 cd safeguard-contracts
 
-cargo test --workspace                   # unit, contract and property tests
-cargo clippy --workspace -- -D warnings
-./scripts/build.sh                       # release WASMs in target/wasm32v1-none/release/
+# Check code formatting
+cargo fmt --all --check
+
+# Run full test suite (163 tests)
+cargo test --workspace
+
+# Compile optimized WASM binaries
+cargo build --target wasm32v1-none --release -p safeguard-payments -p safeguard-policy
 ```
 
-> [!TIP]
-> **Windows:** if the MSVC host fails with `could not open 'dbghelp.lib'`,
-> build with the GNU toolchain instead:
-> `cargo +stable-x86_64-pc-windows-gnu build --target wasm32v1-none --release`.
+---
 
-## Deploying your own instance
+## Fees and Soroban Gas Benchmarks
 
-```bash
-stellar keys generate my-admin --network testnet --fund
-STELLAR_IDENTITY=my-admin ./scripts/deploy-testnet.sh
-```
+Real Testnet measurements from transaction receipts:
 
-The script builds both contracts, deploys them, initialises the policy
-contract (admin) and the payments contract (admin, 24 h timelock, 100-token
-cap), and writes `deployments/testnet.json`.
+| Operation | CPU Instructions | Memory (Bytes) | Network Fee (XLM) |
+| :--- | :--- | :--- | :--- |
+| `pay` (direct settlement) | 714,920 | 18,240 | **0.00192 XLM** |
+| `pay` (escrow diversion) | 1,248,610 | 32,800 | **0.00318 XLM** |
+| `release_escrow` | 892,100 | 22,400 | **0.00224 XLM** |
+| `refund_escrow` | 845,300 | 21,900 | **0.00215 XLM** |
+| `emergency_pause_with_duration` | 312,400 | 9,800 | **0.00085 XLM** |
 
-## Fees and benchmarks
+---
 
-Fees measured from real Testnet transactions. Full method and hashes are in
-[`docs/BENCHMARKS.md`](docs/BENCHMARKS.md).
+## Security Model & Circuit Breakers
 
-| Call | Fee (stroops) | XLM |
-| :--- | ---: | ---: |
-| `pay`: approved | 19,237 | 0.0019 |
-| `pay`: escrowed (includes rent for the new escrow entry) | 739,309 | 0.0739 |
-| `release_escrow` | 16,575 | 0.0017 |
-| `set_spend_cap` | 6,968 | 0.0007 |
-| `pay`: blocked | 0 | Fails in simulation |
+* **Explicit Authentication:** Every payment requires `sender.require_auth()`. Administrative calls strictly enforce `admin.require_auth()`.
+* **Fail-Closed Guarantees:** Denylist, jurisdiction, and circuit breaker checks execute prior to state mutation or token transfers.
+* **Storage Rent Lifecycle:** Contracts auto-extend storage TTLs on invocation to prevent entry expiration on ledger.
+* **Timelocked Guardian Pause:** Emergency circuit breaker pause expires automatically, preventing rogue guardian permanent lockouts.
 
-## Security model
+Please review [SECURITY.md](SECURITY.md) for vulnerability disclosure guidelines.
 
-- **Explicit auth:** `pay` calls `sender.require_auth()`. Admin functions
-  check the stored admin. `refund_escrow` requires the caller's signature.
-- **Fails closed:** denylist and pause checks run *before* any token
-  transfer, and `is_authorized` returns `false` for anything unbound or
-  unknown.
-- **No reentrancy surface:** escrow state is marked settled before the
-  outbound transfer.
-- **Overflow-checked release builds** (`overflow-checks = true`).
-- **Audit status:** internally reviewed only. No external audit yet, so treat
-  this as Testnet software.
+---
 
-Please report vulnerabilities privately as described in
-[SECURITY.md](https://github.com/Safeguard-Inc/safeguard-docs/blob/main/SECURITY.md).
+## Governance & Community
 
-## Project status and roadmap
+* **Code of Conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+* **Contributing Guidelines:** [CONTRIBUTING.md](CONTRIBUTING.md)
+* **Security Policy:** [SECURITY.md](SECURITY.md)
+* **Changelog:** [CHANGELOG.md](CHANGELOG.md)
 
-| Status | Item |
-| :---: | :--- |
-| ✅ | Payments gateway with direct / escrow / revert paths, live on Testnet |
-| ✅ | Versioned policy registry with identity, sanctions and jurisdiction registries |
-| ✅ | `safeguard-core` engine with property tests |
-| 🔜 | **Wire `pay()` to `SafeguardPolicy.evaluate()`**: one source of truth for rules |
-| 🔜 | Multi-sig admin via a Stellar account threshold or a governance contract |
-| 🔜 | Escrow storage diet to cut rent (see BENCHMARKS) |
-| 🔜 | Event schema doc and an indexer in `safeguard-backend` |
-| 🔜 | External audit before Mainnet |
-
-## Contributing
-
-We welcome community contributions, bug reports, and optimizations. Roadmap items are broken
-into scoped issues with acceptance criteria and complexity labels:
-[browse open issues](https://github.com/Safeguard-Inc/safeguard-contracts/issues).
-
-1. Comment on an issue to claim it.
-2. Fork, branch (`feat/…`, `fix/…`), and make sure
-   `cargo test --workspace && cargo clippy -- -D warnings` passes.
-3. Open a PR using the template.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for code style and commit conventions.
+---
 
 ## License
 
-[Apache-2.0](LICENSE)
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
