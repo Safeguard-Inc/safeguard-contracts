@@ -552,3 +552,39 @@ fn test_min_payment_threshold() {
     let receipt = client.pay(&sender, &recipient, &token_client.address, &15_0000000);
     assert_eq!(receipt.status, PaymentStatus::Approved);
 }
+
+#[test]
+fn test_is_active_escrow() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &50_0000000);
+
+    // Non-existent escrow returns false
+    assert!(!client.is_active_escrow(&1));
+    assert!(!client.is_active_escrow(&999));
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &200_0000000);
+
+    // Payment exceeding spend cap (75 > 50) routes to escrow id 1
+    let receipt = client.pay(&sender, &recipient, &token_client.address, &75_0000000);
+    assert_eq!(receipt.status, PaymentStatus::Escrowed);
+    assert_eq!(receipt.escrow_id, 1);
+
+    // Active escrow should now be true
+    assert!(client.is_active_escrow(&1));
+
+    // After release, escrow is no longer pending, so is_active_escrow returns false
+    client.release_escrow(&1);
+    assert!(!client.is_active_escrow(&1));
+}
