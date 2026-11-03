@@ -35,6 +35,17 @@ pub struct PolicyContractMetadata {
     pub policy_authorities_count: u32,
 }
 
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PolicyVersionDetails {
+    pub policy_id: BytesN<32>,
+    pub version: u32,
+    pub status: u32,
+    pub config_hash: BytesN<32>,
+    pub rules_count: u32,
+    pub bound_tokens_count: u32,
+}
+
 #[contract]
 pub struct PolicyContract;
 
@@ -228,6 +239,26 @@ impl PolicyContract {
         version: u32,
     ) -> Result<PolicyVersionRecord, ContractError> {
         lifecycle::get_version(&env, &policy_id, version)
+    }
+
+    /// Aggregated version details returning rule count, status, hash, and bound token count.
+    pub fn get_policy_version_details(
+        env: Env,
+        policy_id: BytesN<32>,
+        version: u32,
+    ) -> Result<PolicyVersionDetails, ContractError> {
+        let record = lifecycle::get_version(&env, &policy_id, version)?;
+        let rules_count = record.rules.len();
+        let bound_tokens_count = Self::bound_tokens_count(env, policy_id.clone());
+
+        Ok(PolicyVersionDetails {
+            policy_id,
+            version,
+            status: record.status,
+            config_hash: record.config_hash,
+            rules_count,
+            bound_tokens_count,
+        })
     }
 
     /// The record of the active version of a policy (public read).
