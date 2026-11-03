@@ -820,6 +820,20 @@ impl SafeguardPayments {
         Ok(())
     }
 
+    /// Check whether multiple addresses are denylisted in a single batch query.
+    pub fn get_denylist_batch(env: Env, addresses: Vec<Address>) -> Vec<bool> {
+        let mut results = Vec::new(&env);
+        for address in addresses.iter() {
+            let is_blocked: bool = env
+                .storage()
+                .persistent()
+                .get(&DataKey::Denylist(address))
+                .unwrap_or(false);
+            results.push_back(is_blocked);
+        }
+        results
+    }
+
     /// Retrieve current spend cap.
     pub fn get_spend_cap(env: Env) -> i128 {
         env.storage()
