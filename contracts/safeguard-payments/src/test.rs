@@ -911,3 +911,65 @@ fn test_cancel_admin_transfer() {
     let res2 = client.try_cancel_admin_transfer();
     assert_eq!(res2, Err(Ok(PaymentError::PendingAdminNotFound)));
 }
+
+#[test]
+fn test_simulate_payment_batch() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let sender = Address::generate(&env);
+    let bob = Address::generate(&env);
+    let charlie = Address::generate(&env);
+    let mallory = Address::generate(&env);
+    let dave = Address::generate(&env);
+    let token = Address::generate(&env);
+
+    client.add_to_denylist(&mallory);
+
+    let mut payments = soroban_sdk::Vec::new(&env);
+    payments.push_back(PaymentCheckParam {
+        recipient: bob.clone(),
+        token: token.clone(),
+        amount: 10_0000000,
+    });
+    payments.push_back(PaymentCheckParam {
+        recipient: charlie.clone(),
+        token: token.clone(),
+        amount: 100_0000000,
+    });
+    payments.push_back(PaymentCheckParam {
+        recipient: mallory.clone(),
+        token: token.clone(),
+        amount: 5_0000000,
+    });
+    payments.push_back(PaymentCheckParam {
+        recipient: dave.clone(),
+        token: token.clone(),
+        amount: 0,
+    });
+
+    let verdicts = client.simulate_payment_batch(&sender, &payments);
+    assert_eq!(verdicts.len(), 4);
+
+    // Bob: Approved
+    assert_eq!(verdicts.get(0).unwrap().status, PaymentStatus::Approved);
+    assert_eq!(verdicts.get(0).unwrap().reason_code, 200);
+
+    // Charlie: Escrowed
+    assert_eq!(verdicts.get(1).unwrap().status, PaymentStatus::Escrowed);
+    assert_eq!(verdicts.get(1).unwrap().reason_code, 201);
+
+    // Mallory: Denylisted
+    assert_eq!(verdicts.get(2).unwrap().status, PaymentStatus::Blocked);
+    assert_eq!(verdicts.get(2).unwrap().reason_code, 111);
+
+    // Dave: Zero amount
+    assert_eq!(verdicts.get(3).unwrap().status, PaymentStatus::Blocked);
+    assert_eq!(verdicts.get(3).unwrap().reason_code, 105);
+}
