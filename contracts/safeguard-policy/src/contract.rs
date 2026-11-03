@@ -103,6 +103,24 @@ impl PolicyContract {
         admin::is_admin_or_policy_authority(&env, &address)
     }
 
+    /// Check whether multiple addresses are authorized registry operators (admin or registry authority).
+    pub fn batch_is_registry_authority(env: Env, addresses: Vec<Address>) -> Vec<bool> {
+        let mut results = Vec::new(&env);
+        for addr in addresses.iter() {
+            results.push_back(admin::is_admin_or_authority(&env, &addr));
+        }
+        results
+    }
+
+    /// Check whether multiple addresses are authorized for policy lifecycle operations (admin or policy authority).
+    pub fn batch_is_policy_authority(env: Env, addresses: Vec<Address>) -> Vec<bool> {
+        let mut results = Vec::new(&env);
+        for addr in addresses.iter() {
+            results.push_back(admin::is_admin_or_policy_authority(&env, &addr));
+        }
+        results
+    }
+
     // ------------------------------------------------------------- lifecycle
 
     /// Register a new draft version of a policy. Admin only; append-only.
