@@ -1376,6 +1376,57 @@ impl SafeguardPayments {
         results
     }
 
+    /// Retrieve escrow IDs matching a status code (1=Pending, 2=Released, 3=Refunded, 4=Disputed, 5=Arbitrated, 0=All)
+    /// with offset and limit pagination.
+    pub fn get_escrow_ids_by_status_paged(
+        env: Env,
+        status_code: u32,
+        offset: u32,
+        limit: u32,
+    ) -> Vec<u64> {
+        if limit == 0 {
+            return Vec::new(&env);
+        }
+
+        let total_escrows: u64 = env
+            .storage()
+            .instance()
+            .get(&DataKey::EscrowCounter)
+            .unwrap_or(0);
+
+        let mut matched = 0u32;
+        let mut results = Vec::new(&env);
+
+        for id in 1..=total_escrows {
+            if let Some(record) = env
+                .storage()
+                .persistent()
+                .get::<_, EscrowRecord>(&DataKey::Escrow(id))
+            {
+                let is_match = match status_code {
+                    1 => record.status == EscrowStatus::Pending,
+                    2 => record.status == EscrowStatus::Released,
+                    3 => record.status == EscrowStatus::Refunded,
+                    4 => record.status == EscrowStatus::Disputed,
+                    5 => record.status == EscrowStatus::Arbitrated,
+                    _ => true,
+                };
+
+                if is_match {
+                    if matched >= offset {
+                        results.push_back(id);
+                        if results.len() >= limit {
+                            break;
+                        }
+                    }
+                    matched += 1;
+                }
+            }
+        }
+
+        results
+    }
+
     /// Retrieve all escrow records associated with a specific sender address.
     pub fn get_escrows_by_sender(env: Env, sender: Address) -> Vec<EscrowRecord> {
         let total_escrows: u64 = env
