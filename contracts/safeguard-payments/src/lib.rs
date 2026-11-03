@@ -101,6 +101,7 @@ enum DataKey {
     Escrow(u64),
     SpendCap,
     IsPaused,
+    Guardian,
     Denylist(Address),
     Allowlist(Address),
     RequireAllowlist,
@@ -205,6 +206,47 @@ impl SafeguardPayments {
         } else {
             Err(PaymentError::PendingAdminNotFound)
         }
+    }
+
+    /// Assign an emergency risk guardian address. Admin only.
+    pub fn set_guardian(env: Env, guardian: Address) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        env.storage().instance().set(&DataKey::Guardian, &guardian);
+        env.events().publish((symbol_short!("set_guard"),), guardian);
+        Ok(())
+    }
+
+    /// Retrieve the configured emergency guardian address.
+    pub fn get_guardian(env: Env) -> Option<Address> {
+        env.storage().instance().get(&DataKey::Guardian)
+    }
+
+    /// Emergency circuit breaker: trigger immediate contract freeze.
+    /// Can be called by the configured Guardian OR Admin.
+    pub fn pause_by_guardian(env: Env, caller: Address) -> Result<(), PaymentError> {
+        caller.require_auth();
+
+        let is_admin = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&DataKey::Admin)
+            .map(|a| a == caller)
+            .unwrap_or(false);
+
+        let is_guardian = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&DataKey::Guardian)
+            .map(|g| g == caller)
+            .unwrap_or(false);
+
+        if !is_admin && !is_guardian {
+            return Err(PaymentError::Unauthorized);
+        }
+
+        env.storage().instance().set(&DataKey::IsPaused, &true);
+        env.events().publish((symbol_short!("guard_pse"),), caller);
+        Ok(())
     }
 
     /// Pause or unpause payment operations.
