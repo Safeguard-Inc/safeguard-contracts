@@ -773,3 +773,43 @@ fn test_arbitrate_escrow() {
     q2.push_back(2);
     assert_eq!(client.get_escrows_batch(&q2).get(0).unwrap().status, EscrowStatus::Refunded);
 }
+
+#[test]
+fn test_get_disputed_escrows() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+    let sender = Address::generate(&env);
+    let recipient1 = Address::generate(&env);
+    let recipient2 = Address::generate(&env);
+    let recipient3 = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &1000_0000000);
+
+    client.pay(&sender, &recipient1, &token_client.address, &100_0000000); // id 1: pending
+    client.pay(&sender, &recipient2, &token_client.address, &100_0000000); // id 2: disputed
+    client.pay(&sender, &recipient3, &token_client.address, &100_0000000); // id 3: disputed
+
+    client.dispute_escrow(&sender, &2);
+    client.dispute_escrow(&recipient3, &3);
+
+    let disputed = client.get_disputed_escrows();
+    assert_eq!(disputed.len(), 2);
+    assert_eq!(disputed.get(0).unwrap().id, 2);
+    assert_eq!(disputed.get(1).unwrap().id, 3);
+
+    // After arbitrating id 2, only id 3 remains disputed
+    client.arbitrate_escrow(&2, &true);
+    let disputed_after = client.get_disputed_escrows();
+    assert_eq!(disputed_after.len(), 1);
+    assert_eq!(disputed_after.get(0).unwrap().id, 3);
+}
