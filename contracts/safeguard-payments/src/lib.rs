@@ -808,6 +808,18 @@ impl SafeguardPayments {
         Ok(())
     }
 
+    /// Remove multiple addresses from the denylist in a single batch transaction.
+    pub fn remove_from_denylist_batch(env: Env, addresses: Vec<Address>) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        for address in addresses.iter() {
+            env.storage()
+                .persistent()
+                .remove(&DataKey::Denylist(address.clone()));
+            env.events().publish((symbol_short!("deny_rem"),), address);
+        }
+        Ok(())
+    }
+
     /// Retrieve current spend cap.
     pub fn get_spend_cap(env: Env) -> i128 {
         env.storage()
