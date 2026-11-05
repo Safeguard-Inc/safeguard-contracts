@@ -35,3 +35,4 @@ If you discover a vulnerability within Safeguard contracts, backend services, or
 ## Bug Bounty & Recognition
 
 We coordinate bug bounty rewards for critical and high-severity discoveries impacting on-chain funds or policy enforcement integrity. Responsible reporters will be credited in our release notes and audit disclosures.
+

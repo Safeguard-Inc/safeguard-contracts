@@ -29,6 +29,8 @@ pub enum PaymentError {
     InvalidDisputeParty = 16,
 }
 
+pub const MAX_BATCH_LIMIT: u32 = 100;
+
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PaymentStatus {
@@ -777,6 +779,10 @@ impl SafeguardPayments {
     ) -> Result<u32, PaymentError> {
         caller.require_auth();
 
+        if escrow_ids.len() > MAX_BATCH_LIMIT {
+            return Err(PaymentError::InvalidAmount);
+        }
+
         let mut count = 0u32;
         for id in escrow_ids.iter() {
             let mut record: EscrowRecord = env
@@ -875,6 +881,10 @@ impl SafeguardPayments {
     ) -> Result<u32, PaymentError> {
         Self::require_admin(&env)?;
 
+        if escrow_ids.len() > MAX_BATCH_LIMIT {
+            return Err(PaymentError::InvalidAmount);
+        }
+
         let mut count = 0u32;
         for id in escrow_ids.iter() {
             let mut record: EscrowRecord = env
@@ -967,6 +977,10 @@ impl SafeguardPayments {
     /// Admin releases multiple active escrows to their respective recipients in bulk.
     pub fn batch_release_escrows(env: Env, escrow_ids: Vec<u64>) -> Result<u32, PaymentError> {
         Self::require_admin(&env)?;
+
+        if escrow_ids.len() > MAX_BATCH_LIMIT {
+            return Err(PaymentError::InvalidAmount);
+        }
 
         let mut count = 0u32;
         for id in escrow_ids.iter() {
@@ -1197,6 +1211,10 @@ impl SafeguardPayments {
         escrow_ids: Vec<u64>,
     ) -> Result<u32, PaymentError> {
         caller.require_auth();
+
+        if escrow_ids.len() > MAX_BATCH_LIMIT {
+            return Err(PaymentError::InvalidAmount);
+        }
 
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         let is_admin = caller == admin;

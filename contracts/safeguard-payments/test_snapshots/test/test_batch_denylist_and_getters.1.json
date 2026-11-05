@@ -194,6 +194,30 @@
                       "key": {
                         "vec": [
                           {
+                            "symbol": "MinPaymentAmount"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "i128": "1"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "PaymentSequence"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "u64": "0"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
                             "symbol": "RequireAllowlist"
                           }
                         ]
@@ -212,6 +236,18 @@
                       },
                       "val": {
                         "i128": "5000000000"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "TotalVolume"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "i128": "0"
                       }
                     }
                   ]

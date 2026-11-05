@@ -1879,3 +1879,23 @@ fn test_get_gateway_telemetry_snapshot() {
     assert_eq!(snap1.current_sequence, 1);
     assert_eq!(snap1.total_volume, 50_0000000);
 }
+
+#[test]
+fn test_batch_limit_protection() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register_contract(None, SafeguardPayments);
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    client.initialize(&admin, &3600, &100_0000000);
+
+    let mut excessive_ids = soroban_sdk::Vec::new(&env);
+    for i in 0..101u64 {
+        excessive_ids.push_back(i);
+    }
+
+    let res = client.try_batch_release_escrows(&excessive_ids);
+    assert_eq!(res, Err(Ok(PaymentError::InvalidAmount)));
+}

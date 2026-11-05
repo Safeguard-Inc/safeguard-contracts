@@ -29,3 +29,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fail-closed denylist screening with zero state changes on reverts.
 - Automated guardian circuit breakers with timelock expiration preventing permanent halts.
 - Safe cross-contract verification against `safeguard-policy` registry.
+
