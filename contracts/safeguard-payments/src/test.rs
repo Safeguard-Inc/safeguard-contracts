@@ -135,6 +135,42 @@ fn test_refund_escrow() {
 }
 
 #[test]
+fn test_claim_escrow_by_recipient() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let contract_id = env.register(SafeguardPayments, ());
+    let client = SafeguardPaymentsClient::new(&env, &contract_id);
+
+    let admin = Address::generate(&env);
+    let token_admin = Address::generate(&env);
+    let token_client = create_token_contract(&env, &token_admin);
+
+    let sender = Address::generate(&env);
+    let recipient = Address::generate(&env);
+
+    client.initialize(&admin, &3600, &50_0000000);
+
+    let token_admin_client = token::StellarAssetClient::new(&env, &token_client.address);
+    token_admin_client.mint(&sender, &200_0000000);
+
+    // Escrow payment
+    client.pay(&sender, &recipient, &token_client.address, &150_0000000);
+
+    // Advance time past timelock (3600s)
+    env.ledger().set_timestamp(4000);
+
+    // Recipient claims
+    client.claim_escrow(&recipient, &1);
+
+    assert_eq!(token_client.balance(&recipient), 150_0000000);
+    assert_eq!(token_client.balance(&contract_id), 0);
+
+    let escrow = client.get_escrow(&1);
+    assert_eq!(escrow.status, EscrowStatus::Released);
+}
+
+#[test]
 #[should_panic(expected = "Error(Contract, #11)")] // RecipientDenylisted = 11
 fn test_denylist_blocks_recipient() {
     let env = Env::default();

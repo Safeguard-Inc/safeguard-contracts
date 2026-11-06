@@ -30,6 +30,8 @@ pub enum PaymentError {
 }
 
 pub const MAX_BATCH_LIMIT: u32 = 100;
+pub const TTL_EXTEND_TO: u32 = 5_000_000;
+pub const TTL_THRESHOLD: u32 = 500_000;
 
 #[contracttype]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -417,6 +419,7 @@ impl SafeguardPayments {
         env.storage()
             .persistent()
             .set(&DataKey::TokenSpendCap(token.clone()), &cap);
+        Self::extend_key_ttl(&env, &DataKey::TokenSpendCap(token.clone()));
         env.events()
             .publish((symbol_short!("t_cap_set"),), (token, cap));
         Ok(())
@@ -473,6 +476,7 @@ impl SafeguardPayments {
         env.storage()
             .persistent()
             .set(&DataKey::Denylist(address.clone()), &true);
+        Self::extend_key_ttl(&env, &DataKey::Denylist(address.clone()));
         env.events().publish((symbol_short!("deny_add"),), address);
         Ok(())
     }
@@ -593,6 +597,29 @@ impl SafeguardPayments {
             return Err(PaymentError::RecipientDenylisted);
         }
 
+        // Check optional mandatory allowlist gating
+        let require_allowlist: bool = env
+            .storage()
+            .instance()
+            .get(&DataKey::RequireAllowlist)
+            .unwrap_or(false);
+        if require_allowlist {
+            if !Self::is_allowlisted(env.clone(), sender.clone()) {
+                env.events().publish(
+                    (symbol_short!("pay_block"), symbol_short!("snd_allow")),
+                    (sender.clone(), recipient.clone(), amount),
+                );
+                return Err(PaymentError::Unauthorized);
+            }
+            if !Self::is_allowlisted(env.clone(), recipient.clone()) {
+                env.events().publish(
+                    (symbol_short!("pay_block"), symbol_short!("rcp_allow")),
+                    (sender.clone(), recipient.clone(), amount),
+                );
+                return Err(PaymentError::Unauthorized);
+            }
+        }
+
         // 3. Screen sender and recipient against external PolicyContract if wired
         if let Some(policy_contract) = env
             .storage()
@@ -700,6 +727,7 @@ impl SafeguardPayments {
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(counter), &record);
+            Self::extend_key_ttl(&env, &DataKey::Escrow(counter));
 
             env.events().publish(
                 (symbol_short!("pay_esc"),),
@@ -1588,6 +1616,7 @@ impl SafeguardPayments {
             env.storage()
                 .persistent()
                 .set(&DataKey::Denylist(address.clone()), &true);
+            Self::extend_key_ttl(&env, &DataKey::Denylist(address.clone()));
             env.events().publish((symbol_short!("deny_add"),), address);
         }
         Ok(())
@@ -1628,6 +1657,7 @@ impl SafeguardPayments {
         env.storage()
             .persistent()
             .set(&DataKey::Allowlist(address.clone()), &true);
+        Self::extend_key_ttl(&env, &DataKey::Allowlist(address.clone()));
         env.events().publish((symbol_short!("allow_add"),), address);
         Ok(())
     }
@@ -1880,6 +1910,67 @@ impl SafeguardPayments {
         }
 
         verdicts
+    }
+
+    /// Recipient claims and releases an escrowed payment to themselves once `release_after` has expired.
+    /// Balances sender refund rights to prevent unilateral sender fund clawback.
+    pub fn claim_escrow(env: Env, caller: Address, escrow_id: u64) -> Result<(), PaymentError> {
+        caller.require_auth();
+
+        let mut record: EscrowRecord = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Escrow(escrow_id))
+            .ok_or(PaymentError::EscrowNotFound)?;
+
+        if record.status != EscrowStatus::Pending {
+            return Err(PaymentError::EscrowAlreadySettled);
+        }
+
+        if caller != record.recipient {
+            return Err(PaymentError::Unauthorized);
+        }
+
+        if env.ledger().timestamp() < record.release_after {
+            return Err(PaymentError::EscrowTimelockActive);
+        }
+
+        record.status = EscrowStatus::Released;
+        env.storage()
+            .persistent()
+            .set(&DataKey::Escrow(escrow_id), &record);
+        Self::extend_key_ttl(&env, &DataKey::Escrow(escrow_id));
+
+        let token_client = token::Client::new(&env, &record.token);
+        token_client.transfer(
+            &env.current_contract_address(),
+            &record.recipient,
+            &record.amount,
+        );
+
+        env.events().publish(
+            (symbol_short!("esc_clm"),),
+            (escrow_id, record.recipient.clone(), record.amount),
+        );
+
+        Ok(())
+    }
+
+    /// Enable or disable mandatory allowlist gating. Admin only.
+    pub fn set_require_allowlist(env: Env, required: bool) -> Result<(), PaymentError> {
+        Self::require_admin(&env)?;
+        env.storage()
+            .instance()
+            .set(&DataKey::RequireAllowlist, &required);
+        env.events()
+            .publish((symbol_short!("set_allow"),), required);
+        Ok(())
+    }
+
+    fn extend_key_ttl(env: &Env, key: &DataKey) {
+        env.storage()
+            .persistent()
+            .extend_ttl(key, TTL_THRESHOLD, TTL_EXTEND_TO);
     }
 
     fn require_admin(env: &Env) -> Result<(), PaymentError> {

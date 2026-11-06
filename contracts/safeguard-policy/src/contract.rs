@@ -566,10 +566,23 @@ impl PolicyContract {
         // record whose expiry has passed degrades to Unknown as well — an
         // expired verification must not keep approving on the enforcement
         // wire. Zero means "no expiry" (see `set_identity`).
-        let account_status = match storage::identity_record(&env, &account) {
-            Some(record) if record.expires_at == 0 => record.status,
-            Some(record) if record.expires_at > env.ledger().timestamp() => record.status,
-            _ => AccountStatus::Unknown.to_code(),
+        let (account_status, subject_ref) = match storage::identity_record(&env, &account) {
+            Some(record) if record.expires_at == 0 => (record.status, record.attestation_ref),
+            Some(record) if record.expires_at > env.ledger().timestamp() => {
+                (record.status, record.attestation_ref)
+            }
+            Some(record) => (AccountStatus::Unknown.to_code(), record.attestation_ref),
+            None => (
+                AccountStatus::Unknown.to_code(),
+                BytesN::from_array(&env, &[0u8; 32]),
+            ),
+        };
+
+        let zero_subject = BytesN::from_array(&env, &[0u8; 32]);
+        let subject = if storage::sanctions_entry(&env, &zero_subject).is_some() {
+            zero_subject
+        } else {
+            subject_ref
         };
 
         let input = EvaluationInput {
@@ -578,7 +591,7 @@ impl PolicyContract {
             denylist_matched: false,
             sanctions_matched: false,
             jurisdiction: storage::jurisdiction(&env, &account).unwrap_or(0),
-            subject: BytesN::from_array(&env, &[0u8; 32]),
+            subject,
             account: account.clone(),
         };
 
