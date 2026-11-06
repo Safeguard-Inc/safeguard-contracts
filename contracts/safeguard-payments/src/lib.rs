@@ -789,6 +789,7 @@ impl SafeguardPayments {
         env.storage()
             .persistent()
             .set(&DataKey::Escrow(escrow_id), &record);
+        Self::extend_key_ttl(&env, &DataKey::Escrow(escrow_id));
 
         env.events().publish(
             (soroban_sdk::symbol_short!("esc_disp"), escrow_id),
@@ -831,6 +832,7 @@ impl SafeguardPayments {
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(id), &record);
+            Self::extend_key_ttl(&env, &DataKey::Escrow(id));
 
             env.events().publish(
                 (soroban_sdk::symbol_short!("esc_disp"), id),
@@ -986,6 +988,7 @@ impl SafeguardPayments {
         env.storage()
             .persistent()
             .set(&DataKey::Escrow(escrow_id), &record);
+        Self::extend_key_ttl(&env, &DataKey::Escrow(escrow_id));
 
         let token_client = token::Client::new(&env, &record.token);
         token_client.transfer(
@@ -1083,6 +1086,7 @@ impl SafeguardPayments {
         env.storage()
             .persistent()
             .set(&DataKey::Escrow(escrow_id), &record);
+        Self::extend_key_ttl(&env, &DataKey::Escrow(escrow_id));
 
         let token_client = token::Client::new(&env, &record.token);
         token_client.transfer(
@@ -1133,6 +1137,7 @@ impl SafeguardPayments {
         env.storage()
             .persistent()
             .set(&DataKey::Escrow(escrow_id), &record);
+        Self::extend_key_ttl(&env, &DataKey::Escrow(escrow_id));
 
         env.events().publish(
             (symbol_short!("esc_ext"), escrow_id),
@@ -1149,6 +1154,10 @@ impl SafeguardPayments {
         extension_seconds: u64,
     ) -> Result<u32, PaymentError> {
         Self::require_admin(&env)?;
+
+        if escrow_ids.len() > MAX_BATCH_LIMIT {
+            return Err(PaymentError::InvalidAmount);
+        }
 
         if extension_seconds == 0 {
             return Err(PaymentError::InvalidEscrowPeriod);
@@ -1172,6 +1181,7 @@ impl SafeguardPayments {
             env.storage()
                 .persistent()
                 .set(&DataKey::Escrow(id), &record);
+            Self::extend_key_ttl(&env, &DataKey::Escrow(id));
 
             env.events().publish(
                 (symbol_short!("esc_ext"), id),
@@ -1215,6 +1225,7 @@ impl SafeguardPayments {
         env.storage()
             .persistent()
             .set(&DataKey::Escrow(escrow_id), &record);
+        Self::extend_key_ttl(&env, &DataKey::Escrow(escrow_id));
 
         let token_client = token::Client::new(&env, &record.token);
         token_client.transfer(
