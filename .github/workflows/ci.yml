@@ -40,7 +40,7 @@ jobs:
         run: cargo fmt --all --check
 
       - name: "[2/10] Run Clippy Linter"
-        run: cargo clippy --workspace --all-targets -- -A deprecated -A clippy::all
+        run: cargo clippy --workspace --all-targets -- -A deprecated -D warnings
 
       - name: "[3/10] Run Core Policy Unit Tests"
         run: cargo test -p safeguard-core --verbose

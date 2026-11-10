@@ -676,9 +676,10 @@ impl SafeguardPayments {
             .instance()
             .get(&DataKey::TotalVolume)
             .unwrap_or(0);
-        env.storage()
-            .instance()
-            .set(&DataKey::TotalVolume, &(current_volume + amount));
+        env.storage().instance().set(
+            &DataKey::TotalVolume,
+            &current_volume.saturating_add(amount),
+        );
 
         // Increment payment sequence number
         let current_seq: u64 = env
@@ -688,7 +689,7 @@ impl SafeguardPayments {
             .unwrap_or(0);
         env.storage()
             .instance()
-            .set(&DataKey::PaymentSequence, &(current_seq + 1));
+            .set(&DataKey::PaymentSequence, &current_seq.saturating_add(1));
 
         // 3. Routing: direct vs escrow
         if amount > spend_cap {

@@ -1954,7 +1954,7 @@ mod tests {
     #[test]
     fn test_error_catalog_has_expected_count() {
         assert_eq!(ERROR_CATALOG.len(), 270);
-        assert!(TOTAL_ERROR_CODES >= 250);
+        assert_eq!(TOTAL_ERROR_CODES, 270);
     }
 
     #[test]

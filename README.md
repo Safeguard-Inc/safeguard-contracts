@@ -54,7 +54,7 @@ Native support for all **SEP-41** tokens, including SAC-wrapped USDC (Circle), E
 | **`safeguard-contracts`** (this repo) | On-chain payments gateway, escrow vault, and dynamic policy registry | Rust, Soroban SDK (Protocol 22+) |
 | [`safeguard-backend`](https://github.com/Safeguard-Inc/safeguard-backend) | High-throughput indexer, simulation engine, and REST API | TypeScript, Express, Stellar SDK |
 | [`safeguard-dashboard`](https://github.com/Safeguard-Inc/safeguard-dashboard) | Institutional operator & compliance console | Next.js 14, React 18, Tailwind |
-| [`safeguard-docs`](https://github.com/Safeguard-Inc/safeguard-docs) | Technical specification, architectural guides, and API references | Static HTML / ESM |
+| [**safeguard-docs**](https://safeguard-docs.vercel.app) | Technical specification, architectural guides, and API references | Static HTML / ESM |
 
 ---
 

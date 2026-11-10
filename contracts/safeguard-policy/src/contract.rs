@@ -148,7 +148,7 @@ impl PolicyContract {
         let admin_opt = Self::admin(env.clone()).ok();
         let mut results = Vec::new(&env);
         for acc in accounts.iter() {
-            let is_admin = admin_opt.as_ref().map_or(false, |a| *a == acc);
+            let is_admin = admin_opt.as_ref().is_some_and(|a| *a == acc);
             let has = is_admin
                 || Self::is_registry_authority(env.clone(), acc.clone())
                 || Self::is_policy_authority(env.clone(), acc.clone());
@@ -163,7 +163,7 @@ impl PolicyContract {
         let admin_opt = Self::admin(env.clone()).ok();
         let mut results = Vec::new(&env);
         for acc in accounts.iter() {
-            let is_admin = admin_opt.as_ref().map_or(false, |a| *a == acc);
+            let is_admin = admin_opt.as_ref().is_some_and(|a| *a == acc);
             let has = match role_type {
                 1 => is_admin,
                 2 => Self::is_registry_authority(env.clone(), acc),
